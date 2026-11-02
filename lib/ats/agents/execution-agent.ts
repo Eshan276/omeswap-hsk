@@ -121,6 +121,46 @@ function resolveTokenSymbol(ticker: string): string {
   return TICKER_ALIAS[upper] ?? upper
 }
 
+// ── Stable leg resolution ─────────────────────────────────────────────────────
+
+type RegistryToken = ReturnType<typeof getChainConfig>['tokens'][string]
+
+/**
+ * Candidate stable symbols in order of preference. The first one that exists
+ * in the chain registry, has a real (non-placeholder) address and is NOT
+ * flagged `lowLiquidity` wins.
+ *
+ * This must never be hardcoded. On HashKey Chain the registry's `USDC` entry
+ * is bridged USDC.e — a real, verified contract whose only HSKSwap pool holds
+ * roughly $0.08 — so QuoterV2 returns no route against it and every agent
+ * trade fails with "no pool with liquidity". USDT is the actual quote hub
+ * there (WHSK/USDT, WETH/USDT, WBTC/USDT). Picking the stable from the
+ * registry keeps this correct as liquidity moves or new chains are added.
+ */
+const STABLE_PREFERENCE = ['USDT', 'USDC', 'USDbC', 'DAI'] as const
+
+function resolveStableLeg(
+  chainConfig: ReturnType<typeof getChainConfig>,
+): { symbol: string; info: RegistryToken } | null {
+  for (const symbol of STABLE_PREFERENCE) {
+    const info = chainConfig.tokens[symbol]
+    if (!info) continue
+    if (isPlaceholderAddress(info.address)) continue
+    if (info.lowLiquidity) continue
+    return { symbol, info }
+  }
+  return null
+}
+
+/** Best-effort stable symbol for labelling an error before a chain is resolved. */
+function stableLabel(chainId: number): string {
+  try {
+    return resolveStableLeg(getChainConfig(chainId))?.symbol ?? 'USDT'
+  } catch {
+    return 'USDT'
+  }
+}
+
 // ── V3 execution path (Ethereum mainnet) ─────────────────────────────────────
 
 async function executeV3Swap(
@@ -136,10 +176,10 @@ async function executeV3Swap(
   }
 
   const tokenSymbol = resolveTokenSymbol(ticker)
-  const stableSymbol = 'USDC'
+  const stable = resolveStableLeg(chainConfig)
 
   const tokenInfo = chainConfig.tokens[tokenSymbol]
-  const stableInfo = chainConfig.tokens[stableSymbol]
+  const stableInfo = stable?.info
 
   if (!tokenInfo) {
     return {
@@ -155,7 +195,21 @@ async function executeV3Swap(
       tx_hash: null, status: 'failed',
       amount_in_usd: 0, token_in: 'unknown', token_out: 'unknown',
       chain_id: chainConfig.chain.id,
-      error: 'USDC not configured in chain registry.',
+      error:
+        `No tradable stable configured for chain ${chainConfig.chain.id}. ` +
+        `Tried ${STABLE_PREFERENCE.join(', ')} — all are missing, placeholders, ` +
+        `or flagged lowLiquidity.`,
+    }
+  }
+
+  if (tokenInfo.lowLiquidity) {
+    return {
+      tx_hash: null, status: 'failed',
+      amount_in_usd: 0, token_in: 'unknown', token_out: 'unknown',
+      chain_id: chainConfig.chain.id,
+      error:
+        `${tokenInfo.symbol} is flagged lowLiquidity on chain ` +
+        `${chainConfig.chain.id} — refusing to execute at a ruinous price.`,
     }
   }
 
@@ -240,18 +294,19 @@ async function executeV2Swap(
       tx_hash: null,
       status: 'pending_deployment',
       amount_in_usd: sizing.size_usd,
-      token_in: decision === 'BUY' ? 'USDC' : resolveTokenSymbol(ticker),
-      token_out: decision === 'BUY' ? resolveTokenSymbol(ticker) : 'USDC',
+      token_in: decision === 'BUY' ? stableLabel(chainConfig.chain.id) : resolveTokenSymbol(ticker),
+      token_out: decision === 'BUY' ? resolveTokenSymbol(ticker) : stableLabel(chainConfig.chain.id),
       chain_id: chainConfig.chain.id,
       error: `No UniswapV2 router configured for chain ${chainConfig.chain.id}. Trade queued — add a router to the chain registry to enable execution.`,
     }
   }
 
   const tokenSymbol = resolveTokenSymbol(ticker)
-  const stableSymbol = 'USDC'
+  const stable = resolveStableLeg(chainConfig)
+  const stableSymbol = stable?.symbol ?? 'USDT'
 
   const tokenInfo = chainConfig.tokens[tokenSymbol]
-  const stableInfo = chainConfig.tokens[stableSymbol]
+  const stableInfo = stable?.info
 
   if (!tokenInfo || isPlaceholderAddress(tokenInfo.address)) {
     return {
@@ -386,8 +441,8 @@ export async function runExecutionAgent(
       tx_hash: null,
       status: 'failed',
       amount_in_usd: sizing.size_usd,
-      token_in: decision === 'BUY' ? 'USDC' : resolveTokenSymbol(ticker),
-      token_out: decision === 'BUY' ? resolveTokenSymbol(ticker) : 'USDC',
+      token_in: decision === 'BUY' ? stableLabel(chainId) : resolveTokenSymbol(ticker),
+      token_out: decision === 'BUY' ? resolveTokenSymbol(ticker) : stableLabel(chainId),
       chain_id: chainId,
       error: errMsg,
     }

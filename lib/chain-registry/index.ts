@@ -1,8 +1,8 @@
 /**
  * Chain Registry — central lookup for all supported chain configs.
  *
- * Default chain: HashKey Chain (lib/chain-registry/chains/hashkey.ts) — testnet
- * (133) unless NEXT_PUBLIC_HASHKEY_NETWORK=mainnet (177). HSKSwap is its DEX.
+ * Default chain: HashKey Chain (lib/chain-registry/chains/hashkey.ts) — mainnet
+ * (177) unless NEXT_PUBLIC_HASHKEY_NETWORK=testnet (133). HSKSwap is its DEX.
  *
  * Note: 0G's Storage / Compute / DA remain in use as external agent
  * infrastructure via lib/zerog — independent of this trading-chain registry.
@@ -14,7 +14,8 @@
  *   pick it up automatically.
  */
 
-import type { ChainConfig, DexRouter, TokenInfo } from './types'
+import { isNativeTokenAddress } from './types'
+import type { BridgeInfo, ChainConfig, DexRouter, TokenInfo } from './types'
 import { HASHKEY_CHAIN_ID, hashkeyMainnetConfig, hashkeyTestnetConfig } from './chains/hashkey'
 
 // ── Registry ─────────────────────────────────────────────────────────────────
@@ -79,6 +80,24 @@ export function getExplorerLink(
   return `${config.explorerUrl}${path}${hash}`
 }
 
+/** Bridges registered for a chain (official first). Empty when none are known. */
+export function getBridges(chainId: number): BridgeInfo[] {
+  return getChainConfig(chainId).bridges ?? []
+}
+
+/**
+ * Resolves a token address for on-chain use: the native sentinel becomes the
+ * chain's wrapped native (WHSK), everything else passes through. Use this
+ * before any quoter / pool / ERC-20 call.
+ */
+export function resolveTradableAddress(chainId: number, address: string): TokenInfo['address'] {
+  const config = getChainConfig(chainId)
+  return isNativeTokenAddress(address)
+    ? config.nativeWrapped
+    : (address as TokenInfo['address'])
+}
+
 // ── Re-exports ────────────────────────────────────────────────────────────────
 
-export type { ChainConfig, DexRouter, TokenInfo } from './types'
+export { NATIVE_TOKEN_ADDRESS, isNativeTokenAddress } from './types'
+export type { BridgeInfo, ChainConfig, DexRouter, TokenInfo } from './types'

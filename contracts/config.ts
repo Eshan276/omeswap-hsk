@@ -26,12 +26,30 @@ export const WRAPPED_NATIVE_ADDRESS = _cfg.nativeWrapped
 
 // ── Token addresses ───────────────────────────────────────────────────────────
 
-export const TOKEN_ADDRESSES: { [key: string]: { address: Address; name: string; symbol: string; decimals: number } } = {
-  // Live chain tokens from the registry (HashKey Chain: WHSK, USDC, USDT, WETH).
+export const TOKEN_ADDRESSES: {
+  [key: string]: {
+    address: Address
+    name: string
+    symbol: string
+    decimals: number
+    /** Native gas coin (HSK) — sentinel address, never an ERC-20 call target. */
+    isNative?: boolean
+    /** Verified on-chain but without usable DEX liquidity. */
+    lowLiquidity?: boolean
+  }
+} = {
+  // Live chain tokens from the registry (HashKey Chain: HSK, WHSK, USDT, WETH, WBTC, USDC.e).
   ...Object.fromEntries(
     Object.entries(_rt).map(([key, t]) => [
       key,
-      { address: t.address, name: t.name, symbol: t.symbol, decimals: t.decimals },
+      {
+        address: t.address,
+        name: t.name,
+        symbol: t.symbol,
+        decimals: t.decimals,
+        isNative: t.isNative,
+        lowLiquidity: t.lowLiquidity,
+      },
     ]),
   ),
   // OmeSwap native tokens (OmE / USDO) appear here once added to the active

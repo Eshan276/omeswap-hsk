@@ -1,6 +1,19 @@
 import type { Chain } from 'viem/chains'
 import type { Address } from 'viem'
 
+/**
+ * Sentinel address representing a chain's native gas coin (HSK on HashKey
+ * Chain) in token lists and routing. It is NOT a deployed contract — resolve it
+ * to the chain's `nativeWrapped` before any on-chain call. Matches the
+ * convention used by most aggregators (EIP-7528).
+ */
+export const NATIVE_TOKEN_ADDRESS =
+  '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE' as Address
+
+export function isNativeTokenAddress(address: string | undefined): boolean {
+  return !!address && address.toLowerCase() === NATIVE_TOKEN_ADDRESS.toLowerCase()
+}
+
 export interface TokenInfo {
   address: Address
   name: string
@@ -8,6 +21,29 @@ export interface TokenInfo {
   decimals: number
   logoUrl?: string
   coingeckoId?: string
+  /**
+   * True for the chain's native gas coin (HSK), which is not an ERC-20.
+   * Its `address` is the NATIVE_TOKEN_ADDRESS sentinel — never call
+   * balanceOf/approve on it. Routing wraps it to `nativeWrapped`.
+   */
+  isNative?: boolean
+  /**
+   * Set when the token is real and verified on-chain but has no usable DEX
+   * liquidity, so the UI can warn instead of quoting a swap that will fail or
+   * execute at a ruinous price.
+   */
+  lowLiquidity?: boolean
+}
+
+export interface BridgeInfo {
+  /** Human-readable label shown in the UI */
+  name: string
+  /** Where the user completes the bridge */
+  url: string
+  /** `official` = canonical rollup bridge; `third-party` = independent service */
+  kind: 'official' | 'third-party'
+  /** One-line description of what it moves */
+  description: string
 }
 
 export interface DexRouter {
@@ -47,4 +83,6 @@ export interface ChainConfig {
   omeswapPools?: Address
   /** OmeSwap deployed router contract (zero address until deployed) */
   omeswapRouter?: Address
+  /** Bridges that move assets in and out of this chain, official first */
+  bridges?: BridgeInfo[]
 }

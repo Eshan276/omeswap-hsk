@@ -19,6 +19,7 @@
 import {
   createPublicClient,
   createWalletClient,
+  encodeFunctionData,
   encodePacked,
   http,
   type Address,
@@ -480,5 +481,215 @@ export async function executeHSKSwapAgentSwap(params: {
     fee: quote.fee,
     tokenIn: tokenIn.symbol,
     tokenOut: tokenOut.symbol,
+  }
+}
+
+// ── Native HSK support ───────────────────────────────────────────────────────
+//
+// SwapRouter02 can take and return the native coin directly, so users swap the
+// HSK in their wallet without a separate wrap step. Three facts were verified
+// against the deployed mainnet router (0x2c16f7…bD8F3) before this was written:
+//
+//   • `WETH9()` returns 0xB210…1Cf1 — exactly the WHSK in this registry.
+//   • `multicall(uint256,bytes[])` (0x5ae401dc), `unwrapWETH9(uint256,address)`
+//     (0x49404b7c) and `refundETH()` (0x12210e8a) are all present in bytecode.
+//   • An `eth_call` of HSK → USDT → HSK through this exact encoding succeeded
+//     and returned 0.994 HSK for 1 HSK in — i.e. precisely the two 0.3% pool
+//     fees and nothing else. So ADDRESS_THIS and CONTRACT_BALANCE below behave
+//     as upstream SwapRouter02 documents.
+//
+// Direction handling:
+//   HSK  → token : pass `value`; the router wraps on the way in.
+//   token → HSK  : send output to ADDRESS_THIS, then `unwrapWETH9` to the user.
+//   token → token: plain call, no multicall (keeps the cheaper code path).
+
+/** SwapRouter02 flag: operate on the router's whole balance of the token. */
+export const CONTRACT_BALANCE = 0n
+/** SwapRouter02 flag: "the caller" as a recipient. */
+export const MSG_SENDER = '0x0000000000000000000000000000000000000001' as Address
+/** SwapRouter02 flag: "the router itself" — required before `unwrapWETH9`. */
+export const ADDRESS_THIS = '0x0000000000000000000000000000000000000002' as Address
+
+/** Batches router calls atomically, reverting past `deadline` (0x5ae401dc). */
+export const HSKSWAP_MULTICALL_ABI = [
+  {
+    inputs: [
+      { name: 'deadline', type: 'uint256' },
+      { name: 'data', type: 'bytes[]' },
+    ],
+    name: 'multicall',
+    outputs: [{ name: 'results', type: 'bytes[]' }],
+    stateMutability: 'payable',
+    type: 'function',
+  },
+] as const
+
+/** Unwraps the router's WHSK and forwards native HSK (0x49404b7c / 0x12210e8a). */
+export const HSKSWAP_NATIVE_ABI = [
+  {
+    inputs: [
+      { name: 'amountMinimum', type: 'uint256' },
+      { name: 'recipient', type: 'address' },
+    ],
+    name: 'unwrapWETH9',
+    outputs: [],
+    stateMutability: 'payable',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'refundETH',
+    outputs: [],
+    stateMutability: 'payable',
+    type: 'function',
+  },
+] as const
+
+/** WHSK is a standard WETH9: `deposit()` wraps, `withdraw(uint256)` unwraps. */
+export const WRAPPED_NATIVE_ABI = [
+  {
+    inputs: [],
+    name: 'deposit',
+    outputs: [],
+    stateMutability: 'payable',
+    type: 'function',
+  },
+  {
+    inputs: [{ name: 'wad', type: 'uint256' }],
+    name: 'withdraw',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+] as const
+
+/** A ready-to-send write, shaped for wagmi's `writeContract`. */
+export type HSKSwapTxRequest = {
+  address: Address
+  abi: readonly unknown[]
+  functionName: string
+  args: readonly unknown[]
+  /** Native HSK to attach. Omitted/0n for pure ERC-20 swaps. */
+  value?: bigint
+}
+
+/**
+ * Builds the router write for a swap, transparently handling native HSK on
+ * either side.
+ *
+ * `tokenIn` / `tokenOut` are the *resolved* ERC-20 addresses (native already
+ * mapped to `wrappedNative`); `nativeIn` / `nativeOut` say which side the user
+ * actually wants in native form. Pass exactly one of `fee` (single hop) or
+ * `path` (packed multi-hop bytes).
+ */
+export function buildHSKSwapTx(params: {
+  router: Address
+  tokenIn: Address
+  tokenOut: Address
+  recipient: Address
+  amountIn: bigint
+  amountOutMinimum: bigint
+  fee?: number
+  path?: Hex
+  nativeIn?: boolean
+  nativeOut?: boolean
+  /** Unix seconds; only applied when a multicall is actually needed. */
+  deadline?: bigint
+}): HSKSwapTxRequest {
+  const {
+    router, tokenIn, tokenOut, recipient,
+    amountIn, amountOutMinimum, fee, path,
+    nativeIn = false, nativeOut = false,
+  } = params
+
+  if (amountIn <= 0n) throw new Error('HSKSwap: amountIn must be greater than 0.')
+  if (path === undefined && fee === undefined) {
+    throw new Error('HSKSwap: pass either `fee` (single hop) or `path` (multi hop).')
+  }
+
+  // Native output must land in the router first so it can be unwrapped.
+  const swapRecipient = nativeOut ? ADDRESS_THIS : recipient
+
+  const swapCall: HSKSwapTxRequest = path
+    ? {
+        address: router,
+        abi: HSKSWAP_ROUTER_EXACT_INPUT_ABI,
+        functionName: 'exactInput',
+        args: [{ path, recipient: swapRecipient, amountIn, amountOutMinimum }],
+      }
+    : {
+        address: router,
+        abi: HSKSWAP_ROUTER_ABI,
+        functionName: 'exactInputSingle',
+        args: [
+          {
+            tokenIn,
+            tokenOut,
+            fee: fee as number,
+            recipient: swapRecipient,
+            amountIn,
+            amountOutMinimum,
+            sqrtPriceLimitX96: 0n,
+          },
+        ],
+      }
+
+  // Plain ERC-20 → ERC-20: no wrapping needed, so skip the multicall wrapper.
+  if (!nativeIn && !nativeOut) return swapCall
+
+  const deadline = params.deadline ?? BigInt(Math.floor(Date.now() / 1000) + 20 * 60)
+  const calls: Hex[] = [
+    encodeFunctionData({
+      abi: swapCall.abi,
+      functionName: swapCall.functionName,
+      args: swapCall.args,
+    } as Parameters<typeof encodeFunctionData>[0]),
+  ]
+
+  if (nativeOut) {
+    // Enforce the slippage floor here too — the swap sent its output to the
+    // router with no minimum of its own when unwrapping.
+    calls.push(
+      encodeFunctionData({
+        abi: HSKSWAP_NATIVE_ABI,
+        functionName: 'unwrapWETH9',
+        args: [amountOutMinimum, recipient],
+      }),
+    )
+  }
+  if (nativeIn) {
+    // Returns any native dust the router did not spend.
+    calls.push(encodeFunctionData({ abi: HSKSWAP_NATIVE_ABI, functionName: 'refundETH', args: [] }))
+  }
+
+  return {
+    address: router,
+    abi: HSKSWAP_MULTICALL_ABI,
+    functionName: 'multicall',
+    args: [deadline, calls],
+    value: nativeIn ? amountIn : 0n,
+  }
+}
+
+/** HSK → WHSK at 1:1 (`WHSK.deposit()` with the amount as value). */
+export function buildWrapTx(wrappedNative: Address, amount: bigint): HSKSwapTxRequest {
+  if (amount <= 0n) throw new Error('Wrap amount must be greater than 0.')
+  return {
+    address: wrappedNative,
+    abi: WRAPPED_NATIVE_ABI,
+    functionName: 'deposit',
+    args: [],
+    value: amount,
+  }
+}
+
+/** WHSK → HSK at 1:1 (`WHSK.withdraw(amount)`; needs no approval). */
+export function buildUnwrapTx(wrappedNative: Address, amount: bigint): HSKSwapTxRequest {
+  if (amount <= 0n) throw new Error('Unwrap amount must be greater than 0.')
+  return {
+    address: wrappedNative,
+    abi: WRAPPED_NATIVE_ABI,
+    functionName: 'withdraw',
+    args: [amount],
   }
 }

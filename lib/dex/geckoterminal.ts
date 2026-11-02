@@ -1,6 +1,7 @@
 import { DEX_MARKETS, getDexMarketConfig, isHashKeyNetwork, type DexMarketConfig } from "./markets";
 import { readOnchainPool } from "./onchain-pool";
 import type { DexCandle, DexDepth, DexDepthRow, DexMarket, DexTrade } from "./types";
+import { getHSKSwapCandlesCached } from "./hskswap-history";
 
 type GeckoPoolResponse = {
   data?: {
@@ -197,12 +198,31 @@ export async function getDexCandles(
     };
   }
 
+  // HSKSwap is not indexed by GeckoTerminal, so rebuild real OHLCV from the
+  // pool's own Uniswap V3 Swap events rather than charting a synthetic series.
+  //
+  // This is checked BEFORE `chartSymbol`/Binance on purpose. WETH and WBTC
+  // carry a Binance proxy symbol for other networks, but on HashKey the pool
+  // IS the venue: its price differs from Binance's (HSKSwap WETH/USDT traded
+  // at 2273.98 while Binance quoted ETHUSDT elsewhere), and an agent's own
+  // swap moves this pool, not Binance. Charting the proxy would also stall
+  // the market for ~76 s whenever Binance is unreachable from the server.
+  if (isHashKeyNetwork(config.network)) {
+    try {
+      const onchain = await getHSKSwapCandlesCached(config, interval, limit);
+      if (onchain.length) return { candles: onchain, isFallback: false };
+    } catch {
+      // Fall through to the synthetic series below, clearly flagged.
+    }
+    return { candles: fallbackCandles(config, interval, limit), isFallback: true };
+  }
+
   if (config.chartSymbol) {
     const candles = await getBinanceCandles(config, interval, limit);
     if (candles.length) return { candles, isFallback: false };
   }
 
-  if (config.kind === "perp" || isHashKeyNetwork(config.network)) {
+  if (config.kind === "perp") {
     return { candles: fallbackCandles(config, interval, limit), isFallback: true };
   }
 

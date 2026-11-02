@@ -5,3 +5,4 @@ export { useWalletAnalysisQuery } from './use-wallet-analysis-query';
 export { useCustomAddressAnalysis } from './use-custom-address-analysis';
 export { useDexSwap } from './use-dex-swap';
 export { usePoolDetails } from './use-pool-details';
+export { useBridge } from './use-bridge';

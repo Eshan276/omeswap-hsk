@@ -107,3 +107,8 @@ changes: compiled, tested (39/39 passing), and deployed custom OmeSwap AMM Multi
 user: Eshan276
 branch: main
 changes: new repo omeswap-hsk — ported Mantle → HashKey Chain (177/133); HSKSwap SwapRouter02/QuoterV2 adapter, on-chain pool pricing, realtime-service + hardhat + docs updated
+
+[2026-11-02 20:15]
+user: ansu555
+branch: main
+changes: HashKey mainnet is now the default trading chain; added native HSK swaps (SwapRouter02 wrap/unwrap via multicall), 1:1 HSK⇄WHSK, flagged dead USDC.e, and built the canonical OP Stack bridge in as a swap-card mode (L1 deposits in-app, withdrawals handed off)

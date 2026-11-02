@@ -16,13 +16,17 @@
 
 import { defineChain } from "viem";
 import type { Address } from "viem";
-import type { ChainConfig } from "../types";
+import { NATIVE_TOKEN_ADDRESS, type ChainConfig } from "../types";
 
 export const HASHKEY_MAINNET_CHAIN_ID = 177;
 export const HASHKEY_TESTNET_CHAIN_ID = 133;
 
-/** `NEXT_PUBLIC_HASHKEY_NETWORK=mainnet` selects mainnet; anything else → testnet. */
-export const USE_HASHKEY_MAINNET = process.env.NEXT_PUBLIC_HASHKEY_NETWORK === "mainnet";
+/**
+ * Mainnet (177) is the default trading chain. Set
+ * `NEXT_PUBLIC_HASHKEY_NETWORK=testnet` to opt into HashKey Chain Testnet (133)
+ * — any other value (including unset) means real funds on mainnet.
+ */
+export const USE_HASHKEY_MAINNET = process.env.NEXT_PUBLIC_HASHKEY_NETWORK !== "testnet";
 
 /** The chain the app trades on by default (agents, swap card, research). */
 export const HASHKEY_CHAIN_ID = USE_HASHKEY_MAINNET
@@ -124,7 +128,13 @@ const TESTNET_USDC = "0x93F960a8DAB5A541e93e6DdaCD54F49a1750DE81" as Address; //
 export const hashkeyMainnetConfig: ChainConfig = {
   chain: hashkeyMainnetChain,
   nativeWrapped: MAINNET_WHSK,
-  // Deepest HSKSwap pools: WHSK/USDT, USDT/WETH, USDT/WBTC (all 0.3%).
+  // USDT is the only real hub. Verified on-chain 2026-11-02 by enumerating every
+  // pool the HSKSwap position manager has ever minted into — exactly three have
+  // usable liquidity, all at the 0.3% tier:
+  //   WHSK/USDT  0x4ff515761864e7838B0AdB8b5b2B8B7A068905dC  ~4.99M WHSK / ~437k USDT
+  //   WETH/USDT  0xb92b79ed6b370D5cFee2E14B1D0983C258304C16  ~21.2 WETH  / ~48.3k USDT
+  //   WBTC/USDT  0xd9EA2cE468957Ba49cCC38C4758Ed6ecD561449A  ~0.655 WBTC / ~50.7k USDT
+  // WETH<->WBTC therefore only routes two-hop through USDT.
   hubTokens: [MAINNET_USDT, MAINNET_WHSK],
   explorerUrl: "https://hashkey.blockscout.com",
   explorerTxPath: "/tx/",
@@ -139,6 +149,15 @@ export const hashkeyMainnetConfig: ChainConfig = {
     },
   ],
   tokens: {
+    // Native gas coin. Not an ERC-20 — routed by wrapping to WHSK.
+    HSK: {
+      address: NATIVE_TOKEN_ADDRESS,
+      name: "HashKey Platform Token",
+      symbol: "HSK",
+      decimals: 18,
+      coingeckoId: "hashkey-ecopoints",
+      isNative: true,
+    },
     WHSK: {
       address: MAINNET_WHSK,
       name: "Wrapped HSK",
@@ -153,12 +172,15 @@ export const hashkeyMainnetConfig: ChainConfig = {
       decimals: 6,
       coingeckoId: "tether",
     },
+    // Real contract (verified: "Bridged USDC", 6 dp) but effectively dead —
+    // total supply ~1.8k and its only pool holds ~$0.08. Not Circle-issued.
     USDC: {
       address: MAINNET_USDC_E,
       name: "Bridged USD Coin",
       symbol: "USDC.e",
       decimals: 6,
       coingeckoId: "usd-coin",
+      lowLiquidity: true,
     },
     WETH: {
       address: MAINNET_WETH,
@@ -177,6 +199,22 @@ export const hashkeyMainnetConfig: ChainConfig = {
   },
   omeswapPools: undefined,
   omeswapRouter: undefined,
+  bridges: [
+    {
+      name: "HashKey Bridge (Superbridge)",
+      url: "https://bridge.hashkeychain.net",
+      kind: "official",
+      description:
+        "Canonical rollup bridge. Moves HSK and supported assets between Ethereum L1 and HashKey Chain. Withdrawals to L1 follow the standard challenge period.",
+    },
+    {
+      name: "Orbiter Finance",
+      url: "https://www.orbiter.finance/en?src_chain=1&tgt_chain=177&src_token=ETH",
+      kind: "third-party",
+      description:
+        "Independent fast bridge for cross-rollup transfers. Minutes instead of the canonical withdrawal window, at a service fee.",
+    },
+  ],
 };
 
 export const hashkeyTestnetConfig: ChainConfig = {
@@ -196,6 +234,14 @@ export const hashkeyTestnetConfig: ChainConfig = {
     },
   ],
   tokens: {
+    HSK: {
+      address: NATIVE_TOKEN_ADDRESS,
+      name: "HashKey Platform Token",
+      symbol: "HSK",
+      decimals: 18,
+      coingeckoId: "hashkey-ecopoints",
+      isNative: true,
+    },
     WHSK: {
       address: TESTNET_WHSK,
       name: "Wrapped HSK",
@@ -221,4 +267,12 @@ export const hashkeyTestnetConfig: ChainConfig = {
   // OmeSwap's own AMM (contract/) — set after `npx hardhat run scripts/deploy.js --network hashkeyTestnet`.
   omeswapPools: undefined,
   omeswapRouter: undefined,
+  bridges: [
+    {
+      name: "HashKey Testnet Bridge",
+      url: "https://testnet-bridge.hashkeychain.net/",
+      kind: "official",
+      description: "Canonical testnet bridge between Sepolia and HashKey Chain Testnet.",
+    },
+  ],
 };

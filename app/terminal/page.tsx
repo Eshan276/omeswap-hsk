@@ -10,12 +10,14 @@ import { Chart } from "./_components/Chart";
 import { OrderBook } from "./_components/OrderBook";
 import { TradePanel } from "./_components/TradePanel";
 import { Footer } from "./_components/Footer";
+import { AgentPipelineDock } from "./_components/AgentPipelineDock";
 
 export default function TerminalPage() {
   const [marketId, setMarketId] = useState(DEFAULT_DEX_MARKET_ID);
   const [isLeftListCollapsed, setIsLeftListCollapsed] = useState(false);
   const [isDepthCollapsed, setIsDepthCollapsed] = useState(false);
   const [isTradeCollapsed, setIsTradeCollapsed] = useState(false);
+  const [isAgentDockCollapsed, setIsAgentDockCollapsed] = useState(false);
 
   return (
     <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
@@ -33,7 +35,14 @@ export default function TerminalPage() {
         >
           <TokenList activeMarketId={marketId} onMarketSelect={setMarketId} />
         </CollapsiblePanel>
-        <Chart marketId={marketId} />
+        <div className="flex min-w-[460px] flex-1 flex-col min-h-0 border-r border-border">
+          <Chart marketId={marketId} />
+          <AgentPipelineDock
+            marketId={marketId}
+            collapsed={isAgentDockCollapsed}
+            onToggle={() => setIsAgentDockCollapsed((current) => !current)}
+          />
+        </div>
         <CollapsiblePanel
           panelId="terminal-order-book"
           collapsed={isDepthCollapsed}

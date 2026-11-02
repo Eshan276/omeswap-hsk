@@ -21,8 +21,12 @@ import {
 } from "@/components/ui/popover";
 import { getExplorerLink, getDexRouters, getDefaultChainId, getChainConfig } from "@/lib/chain-registry";
 import { HSKSWAP_DEX_ID } from "@/lib/dex/hskswap";
+import { BridgePanel } from "@/components/trade/BridgePanel";
 
-type SwapMode = "swap" | "limit" | "buy" | "sell";
+type SwapMode = "swap" | "bridge" | "limit";
+
+/** Modes that are actually implemented; the rest render disabled. */
+const ENABLED_MODES: SwapMode[] = ["swap", "bridge"];
 
 interface SwapCardDexProps {
   onTokensChange?: (tokenIn: string, tokenOut: string) => void;
@@ -43,12 +47,28 @@ const DEX_LABELS: Record<string, { name: string; color: string }> =
 const DEFAULT_CHAIN_ID = getDefaultChainId();
 const DEFAULT_CHAIN_NAME = getChainConfig(DEFAULT_CHAIN_ID).chain.name;
 
+/** Registry keys offered in the token pickers, native coin first. */
+const SELECTABLE_TOKENS: ReadonlyArray<
+  readonly [string, (typeof TOKEN_ADDRESSES)[string]]
+> = Object.entries(TOKEN_ADDRESSES).sort(
+  ([, a], [, b]) => Number(!!b.isNative) - Number(!!a.isNative),
+);
+
+const DEFAULT_TOKEN_IN =
+  SELECTABLE_TOKENS.find(([, t]) => t.isNative)?.[0] ?? "WHSK";
+const DEFAULT_TOKEN_OUT = TOKEN_ADDRESSES.USDT ? "USDT" : "USDC";
+
+/** Native gas to hold back on "Max" so the swap itself can still be paid for. */
+const NATIVE_GAS_BUFFER = 0.01;
+
 export function SwapCardDex({ onTokensChange }: SwapCardDexProps) {
   const { isConnected, chain, address, switchChain } = useWallet();
 
   const [mode, setMode] = useState<SwapMode>("swap");
-  const [tokenIn, setTokenIn] = useState<string>("WHSK");
-  const [tokenOut, setTokenOut] = useState<string>("USDC");
+  // Default to the native coin the user actually holds, into USDT — the only
+  // stablecoin on HashKey Chain with real HSKSwap liquidity.
+  const [tokenIn, setTokenIn] = useState<string>(DEFAULT_TOKEN_IN);
+  const [tokenOut, setTokenOut] = useState<string>(DEFAULT_TOKEN_OUT);
   const [amountIn, setAmountIn] = useState<string>("");
   const [slippage, setSlippage] = useState<number>(0.5);
   const [isPayTokenOpen, setIsPayTokenOpen] = useState(false);
@@ -70,6 +90,8 @@ export function SwapCardDex({ onTokensChange }: SwapCardDexProps) {
     hash,
     error,
     isLoadingQuotes,
+    isNativeIn,
+    isWrapOrUnwrap,
   } = useDexAggregator(tokenIn, tokenOut, amountIn, slippage);
 
   // tokenIn/tokenOut are object keys in TOKEN_ADDRESSES (e.g. "WHSK", "USDC")
@@ -105,6 +127,14 @@ export function SwapCardDex({ onTokensChange }: SwapCardDexProps) {
     onTokensChange?.(newIn, newOut);
   };
 
+  // Spending the whole native balance would leave nothing to pay gas with, so
+  // "Max" holds a little HSK back. ERC-20s can go to the last unit.
+  const maxSpendable = (() => {
+    const bal = parseFloat(balance) || 0;
+    if (!isNativeIn) return bal > 0 ? balance : "0";
+    return Math.max(bal - NATIVE_GAS_BUFFER, 0).toString();
+  })();
+
   const hasValidAmount = amountIn && parseFloat(amountIn) > 0;
   const hasSufficientBalance = parseFloat(balance) >= parseFloat(amountIn || "0");
   const hasQuote = quotes.length > 0 && parseFloat(estimatedOutput) > 0;
@@ -139,13 +169,13 @@ export function SwapCardDex({ onTokensChange }: SwapCardDexProps) {
           />
         </div>
         <div className="grid gap-1 max-h-96 overflow-y-auto">
-          {Object.entries(TOKEN_ADDRESSES)
-            .filter(([key]) => ['WHSK', 'USDT', 'USDC', 'WETH', 'WBTC'].includes(key))
-            .sort(([keyA], [keyB]) => {
-              // Sort tokens with non-zero balance to the top
+          {[...SELECTABLE_TOKENS]
+            .sort(([keyA, tokA], [keyB, tokB]) => {
+              // Funded tokens first, then the native coin, then the rest.
               const balA = parseFloat(walletBalances[keyA] ?? '0');
               const balB = parseFloat(walletBalances[keyB] ?? '0');
-              return balB - balA;
+              if (balB !== balA) return balB - balA;
+              return Number(!!tokB.isNative) - Number(!!tokA.isNative);
             })
             .map(([key, token]) => {
               const bal = walletBalances[key];
@@ -160,7 +190,19 @@ export function SwapCardDex({ onTokensChange }: SwapCardDexProps) {
                   <div className="flex items-center gap-3">
                     <TokenIcon symbol={token.symbol} />
                     <div className="text-left">
-                      <div className="font-semibold">{token.symbol}</div>
+                      <div className="font-semibold flex items-center gap-1.5">
+                        {token.symbol}
+                        {token.isNative && (
+                          <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded font-medium">
+                            Native
+                          </span>
+                        )}
+                        {token.lowLiquidity && (
+                          <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded font-medium">
+                            No liquidity
+                          </span>
+                        )}
+                      </div>
                       <div className="text-xs text-muted-foreground">{token.name}</div>
                     </div>
                   </div>
@@ -192,7 +234,9 @@ export function SwapCardDex({ onTokensChange }: SwapCardDexProps) {
     );
   }
 
-  if (isWrongNetwork) {
+  // Bridge mode deliberately bypasses this guard: a deposit is signed on
+  // Ethereum, so being "off" HashKey Chain is the correct state there.
+  if (isWrongNetwork && mode !== "bridge") {
     return (
       <div className="swap-card w-full max-w-md p-8 text-center">
         <h3 className="text-xl font-semibold mb-4 text-destructive">Wrong Network</h3>
@@ -218,16 +262,16 @@ export function SwapCardDex({ onTokensChange }: SwapCardDexProps) {
       {/* Mode Selector */}
       <div className="flex items-center justify-between p-5 pb-2 gap-3">
         <div className="flex items-center gap-1 bg-muted/50 rounded-xl p-1 overflow-x-auto scrollbar-hide">
-          {(["swap", "limit", "buy", "sell"] as SwapMode[]).map((m) => (
+          {(["swap", "bridge", "limit"] as SwapMode[]).map((m) => (
             <button
               key={m}
               onClick={() => setMode(m)}
               className={cn(
                 "mode-tab capitalize whitespace-nowrap",
                 mode === m ? "mode-tab-active" : "mode-tab-inactive",
-                m !== "swap" && "opacity-40 cursor-not-allowed"
+                !ENABLED_MODES.includes(m) && "opacity-40 cursor-not-allowed"
               )}
-              disabled={m !== "swap"}
+              disabled={!ENABLED_MODES.includes(m)}
             >
               {m}
               {m === "limit" && (
@@ -275,14 +319,24 @@ export function SwapCardDex({ onTokensChange }: SwapCardDexProps) {
         </Popover>
       </div>
 
+      {mode === "bridge" && <BridgePanel />}
+
+      {mode === "swap" && (
       <div className="p-4 pt-2 space-y-2">
         {/* Pay Section */}
         <div className="token-input-section">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm text-muted-foreground">Pay</span>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Wallet className="w-3 h-3" />
               <span>{parseFloat(balance).toFixed(4)} {payToken.symbol}</span>
+              <button
+                onClick={() => setAmountIn(maxSpendable)}
+                disabled={parseFloat(maxSpendable) <= 0}
+                className="px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium hover:bg-primary/20 transition-colors disabled:opacity-40"
+              >
+                Max
+              </button>
             </div>
           </div>
           <div className="flex items-center justify-between gap-4">
@@ -336,6 +390,26 @@ export function SwapCardDex({ onTokensChange }: SwapCardDexProps) {
             </button>
           </div>
         </div>
+
+        {/* Warn before a pair that cannot fill, rather than after it reverts. */}
+        {(payToken.lowLiquidity || receiveToken.lowLiquidity) && (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+            <span className="font-medium">
+              {payToken.lowLiquidity ? payToken.symbol : receiveToken.symbol} has no HSKSwap
+              liquidity.
+            </span>{" "}
+            It is a real bridged token, but no pool holds a usable amount of it, so this
+            swap will fail or fill at a ruinous price. Use USDT as the stable side.
+          </div>
+        )}
+
+        {isWrapOrUnwrap && hasValidAmount && (
+          <div className="rounded-xl border border-primary/30 bg-primary/10 p-3 text-xs text-muted-foreground">
+            <span className="font-medium text-primary">1:1 conversion</span> — HSK and WHSK
+            are the same asset, so this settles on the WHSK contract with no pool, no price
+            impact and no swap fee. You pay only gas.
+          </div>
+        )}
 
         {/* Route Selector */}
         {hasValidAmount && (
@@ -458,6 +532,7 @@ export function SwapCardDex({ onTokensChange }: SwapCardDexProps) {
           <div className="mt-2 text-sm text-destructive">Insufficient balance</div>
         )}
       </div>
+      )}
 
       <TokenSelectorModal open={isPayTokenOpen} onOpenChange={setIsPayTokenOpen} type="pay" />
       <TokenSelectorModal open={isReceiveTokenOpen} onOpenChange={setIsReceiveTokenOpen} type="receive" />

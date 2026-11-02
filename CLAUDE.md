@@ -21,8 +21,15 @@ npx hardhat run scripts/addLiquidity.js  --network hashkeyTestnet  # seed liquid
 
 ## Environment
 
+Copy `.env.example` → `.env.local`. Minimum to run against mainnet:
+
 ```bash
-NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=  # required — from cloud.walletconnect.com
+NEXT_PUBLIC_HASHKEY_NETWORK=mainnet    # default; `testnet` opts out. REAL FUNDS.
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=  # from cloud.reown.com; blank = injected/MetaMask only
+NEXT_PUBLIC_ETHEREUM_RPC=              # L1 RPC, bridge only — use a private endpoint
+SUPABASE_URL=                          # server-side only
+SUPABASE_SERVICE_ROLE_KEY=             # server-side only — never NEXT_PUBLIC_
+OPENROUTER_API_KEY=                    # also read as OPEN_ROUTER_API_KEY
 ```
 
 ## Architecture
@@ -69,7 +76,25 @@ Single source of truth for all chain config (RPC URLs, contract addresses, token
 
 To add a new chain: create `lib/chain-registry/chains/<chain>.ts` exporting a `ChainConfig`, import it in `lib/chain-registry/index.ts`, and add to `REGISTRY`. The wallet provider, swap hooks, and agent nodes pick it up automatically.
 
-Currently registered: **HashKey Chain** — mainnet 177 and testnet 133 are both registered with the wallet; the default trading chain is testnet unless `NEXT_PUBLIC_HASHKEY_NETWORK=mainnet`. Config file: `lib/chain-registry/chains/hashkey.ts`.
+Currently registered: **HashKey Chain** — mainnet 177 and testnet 133 are both registered with the wallet. **The default trading chain is mainnet (real funds)**; set `NEXT_PUBLIC_HASHKEY_NETWORK=testnet` to opt out. Config file: `lib/chain-registry/chains/hashkey.ts`.
+
+Ethereum mainnet (1) is added to the *wallet* in `wallet-provider.tsx` but deliberately **not** to the registry — it exists only so canonical-bridge deposits (which are L1 transactions) can be signed, and must never be offered as a DEX routing venue.
+
+#### Native HSK
+
+HSK is the gas coin, not an ERC-20. The registry lists it under key `HSK` with the `NATIVE_TOKEN_ADDRESS` sentinel and `isNative: true`. Never call `balanceOf`/`approve` on that address — resolve it to `nativeWrapped` (WHSK) first, which `resolveTradableAddress()` and `useDexAggregator` do. SwapRouter02 wraps and unwraps natively, so swaps go HSK→token and token→HSK directly (see `buildHSKSwapTx` in `lib/dex/hskswap.ts`). HSK⇄WHSK is detected as a 1:1 wrap and settles on the WHSK contract, not through a pool.
+
+#### Verified mainnet liquidity (2026-11-02)
+
+Every pool the HSKSwap position manager has ever minted into was enumerated. Only **three** have usable liquidity, all at the **0.3%** tier, all hubbed on **USDT**:
+
+| Pool | Reserves | Address |
+|------|----------|---------|
+| WHSK/USDT | ~4.99M WHSK / ~437k USDT | `0x4ff515761864e7838B0AdB8b5b2B8B7A068905dC` |
+| WETH/USDT | ~21.2 WETH / ~48.3k USDT | `0xb92b79ed6b370D5cFee2E14B1D0983C258304C16` |
+| WBTC/USDT | ~0.655 WBTC / ~50.7k USDT | `0xd9EA2cE468957Ba49cCC38C4758Ed6ecD561449A` |
+
+So WETH↔WBTC only routes two-hop via USDT. **USDC.e is dead** (~1.8k supply, ~$0.08 pooled, not Circle-issued) and is flagged `lowLiquidity: true` so the UI warns instead of quoting. There is no HashKey-issued stablecoin — USDT is the only real stable.
 
 ### 0G SDK Layer (`lib/zerog/`)
 
@@ -83,7 +108,18 @@ External AI/data infrastructure — **intentionally remains on 0G** regardless o
 
 `contracts/config.ts` is a backward-compatible shim that re-exports from the chain registry. The OmeSwap custom AMM (`MultiTokenLiquidityPools` + `MultiHopSwapRouter`, source in `contract/`) is not deployed on HashKey yet — after `--network hashkeyTestnet`, set `omeswapPools` and `omeswapRouter` in `hashkeyTestnetConfig` in `lib/chain-registry/chains/hashkey.ts`. The live app does not require them: swaps route through HSKSwap.
 
-HSKSwap is the only DEX router (`hskswap`, type `custom`). Its adapter is `lib/dex/hskswap.ts`. **SwapRouter02's `exactInputSingle` / `exactInput` structs have no `deadline` field** — using the original V3 SwapRouter ABI will revert. Enabled fee tiers: 100 / 500 / 3000 / 10000.
+HSKSwap is the only DEX router (`hskswap`, type `custom`). Its adapter is `lib/dex/hskswap.ts`. **SwapRouter02's `exactInputSingle` / `exactInput` structs have no `deadline` field** — using the original V3 SwapRouter ABI will revert. Enabled fee tiers: 100 / 500 / 3000 / 10000 (only 3000 has pools).
+
+### Canonical Bridge (`lib/bridge/hashkey-bridge.ts`)
+
+HashKey Chain is an **OP Stack rollup with a custom gas token**: HSK is native on L2 and an ERC-20 (`0xE7C6…C98a`) on L1. Two consequences, both verified on-chain, drive the bridge UI:
+
+- **ETH cannot be bridged.** `L1StandardBridge.depositETH` reverts with `"StandardBridge: cannot bridge ETH with custom gas token"`. Users bridge **WETH**, the ERC-20.
+- **Withdrawals are not one transaction.** L2→L1 is withdraw → fault-proof challenge window → prove → finalize. Deposits run in-app; withdrawals start in-app and finish on the canonical bridge, which tracks the claim.
+
+L1↔L2 token pairings in `BRIDGEABLE_ASSETS` are read from each L2 token's own `remoteToken()` — the authoritative source, since the bridge mints against exactly that mapping. Never add a pairing on trust: a wrong one strands funds permanently. **USDC.e is excluded** — it has no `remoteToken()`, so it is not canonically bridged.
+
+The UI is a **`bridge` mode inside `SwapCardDex`** (`components/trade/BridgePanel.tsx`), not a separate route — bridging is part of entering a position. Bridge mode intentionally bypasses the wrong-network guard, because a deposit is correctly signed on Ethereum.
 
 HashKey markets (`lib/dex/markets.ts`, network `hashkey` / `hashkey-testnet`) are priced on-chain from pool `slot0` (`lib/dex/onchain-pool.ts`); GeckoTerminal does not index HSKSwap. Mainnet liquidity sits in WHSK/USDT, USDT/WETH and USDT/WBTC (0.3%); USDC.e is near-empty, so USDT is the default quote/hub.
 

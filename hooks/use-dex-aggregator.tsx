@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import {
   useAccount,
+  useBalance,
   useWriteContract,
   useWaitForTransactionReceipt,
   usePublicClient,
@@ -12,11 +13,16 @@ import {
 import { parseUnits, formatUnits, Address, Hex } from "viem";
 import { MAINNET_TOKENS } from "@/contracts/config";
 import { ERC20ABI } from "@/contracts/abis";
-import { getChainConfig, getDefaultChainId } from "@/lib/chain-registry";
+import {
+  getChainConfig,
+  getDefaultChainId,
+  isNativeTokenAddress,
+} from "@/lib/chain-registry";
 import {
   HSKSWAP_DEX_ID,
-  HSKSWAP_ROUTER_ABI,
-  HSKSWAP_ROUTER_EXACT_INPUT_ABI,
+  buildHSKSwapTx,
+  buildUnwrapTx,
+  buildWrapTx,
   isPlaceholderAddress,
   quoteHSKSwapBestTier,
   quoteHSKSwapMultiHop,
@@ -25,6 +31,8 @@ import { useTransactionStore } from "@/store/transaction-store";
 
 const OMESWAP_DEX_ID = "omeswap" as const;
 const OMESWAP_DEX_NAME = "Omega";
+/** Pseudo-venue for the 1:1 HSK ⇄ WHSK conversion (settles on WHSK itself). */
+const WRAP_DEX_ID = "wrap" as const;
 
 const OMESWAP_POOLS_ABI = [
   {
@@ -144,6 +152,27 @@ export function useDexAggregator(
   const publicClient = usePublicClient({ chainId });
   const tokenIn = MAINNET_TOKENS[tokenInSymbol];
   const tokenOut = MAINNET_TOKENS[tokenOutSymbol];
+
+  // ── Native HSK ──────────────────────────────────────────────────────────────
+  // HSK is the gas coin, not an ERC-20. Quote and route it as WHSK, but keep
+  // the user's chosen side native so the router wraps/unwraps for them.
+  const nativeIn = isNativeTokenAddress(tokenIn?.address);
+  const nativeOut = isNativeTokenAddress(tokenOut?.address);
+  const wrappedNative = chainConfig.nativeWrapped;
+  // Cast is safe: every consumer below sits behind a `!tokenIn || !tokenOut` guard.
+  const tokenInAddress = (nativeIn ? wrappedNative : tokenIn?.address) as Address;
+  const tokenOutAddress = (nativeOut ? wrappedNative : tokenOut?.address) as Address;
+
+  /**
+   * HSK ⇄ WHSK is not a swap — there is no pool, the rate is exactly 1:1 and it
+   * settles through WHSK's own deposit/withdraw. Detected here so the UI can
+   * quote and execute it instead of reporting "no liquidity".
+   */
+  const isWrap =
+    nativeIn && !nativeOut && tokenOutAddress?.toLowerCase() === wrappedNative.toLowerCase();
+  const isUnwrap =
+    nativeOut && !nativeIn && tokenInAddress?.toLowerCase() === wrappedNative.toLowerCase();
+  const isWrapOrUnwrap = !!(isWrap || isUnwrap);
   // Uniswap-V3-shaped "custom" routers (HSKSwap) — QuoterV2 + SwapRouter02,
   // quoted and executed generically via the HSKSwap adapter's ABIs.
   const v3CustomDexConfig = chainConfig.dexRouters
@@ -152,9 +181,11 @@ export function useDexAggregator(
     .filter(({ router, quoter }) => !isPlaceholderAddress(router) && !isPlaceholderAddress(quoter));
   const hasV3CustomRouters =
     v3CustomDexConfig.length > 0 &&
-    !!tokenIn &&
-    !!tokenOut &&
-    tokenIn.address.toLowerCase() !== tokenOut.address.toLowerCase();
+    !!tokenInAddress &&
+    !!tokenOutAddress &&
+    // Compare resolved addresses: HSK and WHSK are the same pool-side asset,
+    // so that pair is a wrap, not a route.
+    tokenInAddress.toLowerCase() !== tokenOutAddress.toLowerCase();
 
   // DEX config derived from registry
   const v1DexConfig = chainConfig.dexRouters
@@ -196,24 +227,36 @@ export function useDexAggregator(
       ? omeswapRouterAddr
       : (selectedDexConfig?.router ?? defaultSpender);
 
-  // Balance query
-  const { data: balance, refetch: refetchBalance } = useReadContract({
+  // Balance query — ERC-20 path.
+  const { data: balance, refetch: refetchErc20Balance } = useReadContract({
     address: tokenIn?.address as Address,
     abi: ERC20ABI,
     functionName: "balanceOf",
     args: [address as Address],
     chainId,
-    query: { enabled: !!address && !!tokenIn },
+    query: { enabled: !!address && !!tokenIn && !nativeIn },
   });
 
-  // Allowance query
+  // Balance query — native HSK path (no contract to call).
+  const { data: nativeBalance, refetch: refetchNativeBalance } = useBalance({
+    address,
+    chainId,
+    query: { enabled: !!address && nativeIn },
+  });
+
+  const refetchBalance = nativeIn ? refetchNativeBalance : refetchErc20Balance;
+
+  // Allowance query. Native HSK is sent as `value`, so it has no allowance;
+  // neither does unwrapping, which burns the caller's own WHSK.
   const { data: allowance, refetch: refetchAllowance } = useReadContract({
     address: tokenIn?.address as Address,
     abi: ERC20ABI,
     functionName: "allowance",
     args: [address as Address, approvalSpender],
     chainId,
-    query: { enabled: !!address && !!tokenIn && hasConfiguredRouters },
+    query: {
+      enabled: !!address && !!tokenIn && hasConfiguredRouters && !nativeIn && !isUnwrap,
+    },
   });
 
   const {
@@ -265,7 +308,7 @@ export function useDexAggregator(
         setQuotes([]);
         return;
       }
-      if (!hasConfiguredRouters) {
+      if (!hasConfiguredRouters && !isWrapOrUnwrap) {
         setQuotes([]);
         setIsLoadingQuotes(false);
         return;
@@ -275,6 +318,23 @@ export function useDexAggregator(
       const amountIn = parseUnits(amountInRaw, tokenIn.decimals);
       const newQuotes: DexQuote[] = [];
 
+      // HSK ⇄ WHSK: fixed 1:1, no pool, no price impact.
+      if (isWrapOrUnwrap) {
+        setQuotes([
+          {
+            dex: WRAP_DEX_ID,
+            dexName: isWrap ? "Wrap HSK" : "Unwrap WHSK",
+            amountOut: amountIn,
+            amountOutFormatted: formatUnits(amountIn, tokenOut.decimals),
+            path: [tokenInAddress, tokenOutAddress],
+            isBest: true,
+          },
+        ]);
+        setSelectedDex(WRAP_DEX_ID);
+        setIsLoadingQuotes(false);
+        return;
+      }
+
       // --- Uniswap-V3-shaped "custom" router quotes (HSKSwap) ---
       // For each router, compare the direct pool against the best two-hop route
       // through a hub token (USDT/WHSK) and keep whichever is better.
@@ -283,14 +343,14 @@ export function useDexAggregator(
           try {
             const [direct, multiHop] = await Promise.all([
               quoteHSKSwapBestTier(publicClient, {
-                tokenIn: tokenIn.address,
-                tokenOut: tokenOut.address,
+                tokenIn: tokenInAddress,
+                tokenOut: tokenOutAddress,
                 amountIn,
                 quoter,
               }),
               quoteHSKSwapMultiHop(publicClient, {
-                tokenIn: tokenIn.address,
-                tokenOut: tokenOut.address,
+                tokenIn: tokenInAddress,
+                tokenOut: tokenOutAddress,
                 amountIn,
                 hubTokens: chainConfig.hubTokens,
                 quoter,
@@ -304,7 +364,7 @@ export function useDexAggregator(
                 dexName,
                 amountOut: direct.amountOut,
                 amountOutFormatted: formatUnits(direct.amountOut, tokenOut.decimals),
-                path: [tokenIn.address, tokenOut.address],
+                path: [tokenInAddress, tokenOutAddress],
                 v3Fee: direct.fee,
                 isBest: false,
               };
@@ -330,15 +390,15 @@ export function useDexAggregator(
       // --- V1 DEX quotes ---
       for (const { dex, dexName, router } of activeV1DexConfig) {
         // Always try direct path
-        const paths: Address[][] = [[tokenIn.address, tokenOut.address]];
+        const paths: Address[][] = [[tokenInAddress, tokenOutAddress]];
 
         // Try hub paths for each registered hub token
         for (const hubAddress of chainConfig.hubTokens) {
           if (
-            tokenIn.address.toLowerCase() !== hubAddress.toLowerCase() &&
-            tokenOut.address.toLowerCase() !== hubAddress.toLowerCase()
+            tokenInAddress.toLowerCase() !== hubAddress.toLowerCase() &&
+            tokenOutAddress.toLowerCase() !== hubAddress.toLowerCase()
           ) {
-            paths.push([tokenIn.address, hubAddress, tokenOut.address]);
+            paths.push([tokenInAddress, hubAddress, tokenOutAddress]);
           }
         }
 
@@ -382,7 +442,7 @@ export function useDexAggregator(
             address: omeswapPoolsAddr,
             abi: OMESWAP_POOLS_ABI,
             functionName: "getPoolId",
-            args: [tokenIn.address, tokenOut.address],
+            args: [tokenInAddress, tokenOutAddress],
           }) as bigint;
 
           if (poolId > 0n) {
@@ -394,7 +454,7 @@ export function useDexAggregator(
             }) as [Address, Address, bigint, bigint, bigint];
 
             const [t0,, reserve0, reserve1] = poolInfo;
-            const isToken0 = tokenIn.address.toLowerCase() === t0.toLowerCase();
+            const isToken0 = tokenInAddress.toLowerCase() === t0.toLowerCase();
             const reserveIn  = isToken0 ? reserve0 : reserve1;
             const reserveOut = isToken0 ? reserve1 : reserve0;
 
@@ -412,7 +472,7 @@ export function useDexAggregator(
                   dexName: OMESWAP_DEX_NAME,
                   amountOut,
                   amountOutFormatted: formatUnits(amountOut, tokenOut.decimals),
-                  path: [tokenIn.address, tokenOut.address],
+                  path: [tokenInAddress, tokenOutAddress],
                   isBest: false,
                 });
               }
@@ -436,13 +496,16 @@ export function useDexAggregator(
   }, [amountInRaw, tokenInSymbol, tokenOutSymbol, publicClient, hasConfiguredRouters, hasV3CustomRouters, hasOmeswapRouter]);
 
   const needsApproval = (): boolean => {
+    // Native HSK travels as `value`, and unwrapping burns the caller's own WHSK
+    // — neither touches an allowance.
+    if (nativeIn || isUnwrap) return false;
     if (!hasConfiguredRouters) return false;
     if (!amountInRaw || allowance === undefined || !tokenIn) return true;
     return parseUnits(amountInRaw, tokenIn.decimals) > (allowance as bigint);
   };
 
   const executeSwapTx = () => {
-    if (!hasConfiguredRouters) {
+    if (!hasConfiguredRouters && !isWrapOrUnwrap) {
       setError("No DEX routers are configured for this chain yet.");
       return;
     }
@@ -454,47 +517,55 @@ export function useDexAggregator(
       (selectedQuote.amountOut * (10000n - slippageBps)) / 10000n;
     const deadline = BigInt(Math.floor(Date.now() / 1000) + 20 * 60);
 
+    // HSK ⇄ WHSK settles 1:1 on the WHSK contract, not through any router.
+    if (isWrapOrUnwrap) {
+      const tx = isWrap
+        ? buildWrapTx(wrappedNative, amountIn)
+        : buildUnwrapTx(wrappedNative, amountIn);
+      writeSwap({
+        address: tx.address,
+        abi: tx.abi,
+        functionName: tx.functionName,
+        args: tx.args,
+        value: tx.value,
+        chainId,
+      } as Parameters<typeof writeSwap>[0]);
+      return;
+    }
+
     if (selectedQuote.dex === OMESWAP_DEX_ID && hasOmeswapRouter && omeswapRouterAddr) {
       writeSwap({
         address: omeswapRouterAddr,
         abi: OMESWAP_ROUTER_ABI,
         functionName: "swapSingleHop",
-        args: [tokenIn.address, tokenOut.address, amountIn, amountOutMin, address],
-        chainId,
-      });
-    } else if (selectedV3CustomDex && selectedQuote.v3Path) {
-      writeSwap({
-        address: selectedV3CustomDex.router,
-        abi: HSKSWAP_ROUTER_EXACT_INPUT_ABI,
-        functionName: "exactInput",
-        args: [
-          {
-            path: selectedQuote.v3Path,
-            recipient: address,
-            amountIn,
-            amountOutMinimum: amountOutMin,
-          },
-        ],
+        args: [tokenInAddress, tokenOutAddress, amountIn, amountOutMin, address],
         chainId,
       });
     } else if (selectedV3CustomDex) {
-      writeSwap({
-        address: selectedV3CustomDex.router,
-        abi: HSKSWAP_ROUTER_ABI,
-        functionName: "exactInputSingle",
-        args: [
-          {
-            tokenIn: tokenIn.address,
-            tokenOut: tokenOut.address,
-            fee: selectedQuote.v3Fee ?? 3000,
-            recipient: address,
-            amountIn,
-            amountOutMinimum: amountOutMin,
-            sqrtPriceLimitX96: 0n,
-          },
-        ],
-        chainId,
+      // One builder covers all four directions: ERC-20↔ERC-20 goes out as a
+      // plain router call, while native HSK on either side is wrapped into a
+      // `multicall` with unwrapWETH9 / refundETH as needed.
+      const tx = buildHSKSwapTx({
+        router: selectedV3CustomDex.router,
+        tokenIn: tokenInAddress,
+        tokenOut: tokenOutAddress,
+        recipient: address,
+        amountIn,
+        amountOutMinimum: amountOutMin,
+        fee: selectedQuote.v3Path ? undefined : selectedQuote.v3Fee ?? 3000,
+        path: selectedQuote.v3Path,
+        nativeIn,
+        nativeOut,
+        deadline,
       });
+      writeSwap({
+        address: tx.address,
+        abi: tx.abi,
+        functionName: tx.functionName,
+        args: tx.args,
+        value: tx.value,
+        chainId,
+      } as Parameters<typeof writeSwap>[0]);
     } else {
       const router = v1DexConfig.find((d) => d.dex === selectedDex)?.router
         ?? activeV1DexConfig[0]?.router;
@@ -513,7 +584,7 @@ export function useDexAggregator(
   };
 
   const executeSwap = () => {
-    if (!hasConfiguredRouters) {
+    if (!hasConfiguredRouters && !isWrapOrUnwrap) {
       setError("No DEX routers are configured for this chain yet.");
       return;
     }
@@ -523,7 +594,7 @@ export function useDexAggregator(
     if (needsApproval()) {
       setIsApproving(true);
       writeApprove({
-        address: tokenIn.address as Address,
+        address: tokenInAddress,
         abi: ERC20ABI,
         functionName: "approve",
         args: [approvalSpender, parseUnits(amountInRaw, tokenIn.decimals)],
@@ -581,10 +652,17 @@ export function useDexAggregator(
     isLoadingQuotes,
     hasConfiguredRouters,
     estimatedOutput: selectedQuote?.amountOutFormatted ?? "0",
-    balance:
-      balance !== undefined && tokenIn
+    balance: nativeIn
+      ? nativeBalance
+        ? formatUnits(nativeBalance.value, nativeBalance.decimals)
+        : "0"
+      : balance !== undefined && tokenIn
         ? formatUnits(balance as bigint, tokenIn.decimals)
         : "0",
+    /** True when the input side is the native gas coin — the UI should leave gas headroom. */
+    isNativeIn: nativeIn,
+    /** True for the 1:1 HSK ⇄ WHSK conversion rather than a pool swap. */
+    isWrapOrUnwrap,
     needsApproval: needsApproval(),
     executeSwap,
     isApproving,
