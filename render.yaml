@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: omeswap-realtime-service
+    env: docker
+    rootDir: realtime-service
+    plan: free
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: MANTLE_NETWORK
+        value: mainnet
+      - key: MANTLE_RPC
+        value: https://rpc.mantle.xyz
+      - key: MANTLE_WSS
+        value: wss://wss.mantle.xyz
