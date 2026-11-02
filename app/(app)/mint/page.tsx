@@ -2,7 +2,7 @@ import { MintTokensCard } from "@/components/trade/MintTokensCard";
 
 export const metadata = {
   title: "Mint Test Tokens | OmEswap",
-  description: "Mint free test tokens to try out OmEswap on Mantle Sepolia Testnet.",
+  description: "Mint free test tokens to try out OmEswap on HashKey Chain Testnet.",
 };
 
 export default function MintPage() {
@@ -13,7 +13,7 @@ export default function MintPage() {
           <div>
             <h1 className="text-2xl font-semibold">Mint Test Tokens</h1>
             <p className="text-sm text-muted-foreground">
-              Get free testnet tokens to try the DEX on Mantle Sepolia
+              Get free testnet tokens to try the DEX on HashKey Chain Testnet
             </p>
           </div>
           <MintTokensCard />

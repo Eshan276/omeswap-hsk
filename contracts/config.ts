@@ -5,7 +5,7 @@
  * backward-compatible import point for the rest of the codebase. To change
  * addresses, update the active chain config in lib/chain-registry/chains/.
  *
- * Default chain: the registry default (Mantle).
+ * Default chain: the registry default (HashKey Chain).
  */
 
 import { getChainConfig, getDefaultChainId } from '@/lib/chain-registry'
@@ -21,22 +21,21 @@ export const CONTRACT_ADDRESSES = {
   ROUTER: (_cfg.omeswapRouter ?? '0x0000000000000000000000000000000000000000') as Address,
 }
 
-/** Wrapped native token address for the active chain (e.g. WMNT on Mantle). */
+/** Wrapped native token address for the active chain (e.g. WHSK on HashKey Chain). */
 export const WRAPPED_NATIVE_ADDRESS = _cfg.nativeWrapped
 
 // ── Token addresses ───────────────────────────────────────────────────────────
 
 export const TOKEN_ADDRESSES: { [key: string]: { address: Address; name: string; symbol: string; decimals: number } } = {
-  // Live chain tokens from the registry (Mantle: WMNT, USDC, USDT, WETH).
+  // Live chain tokens from the registry (HashKey Chain: WHSK, USDC, USDT, WETH).
   ...Object.fromEntries(
     Object.entries(_rt).map(([key, t]) => [
       key,
       { address: t.address, name: t.name, symbol: t.symbol, decimals: t.decimals },
     ]),
   ),
-  // OmeSwap native tokens — pending deployment on the active chain.
-  OmE: _rt.OmE ?? { address: '0x87E3FC6944FAe11FEfd71d61003f42C6d1b445BF' as Address, name: 'OmE Token', symbol: 'OmE', decimals: 18 },
-  USDO: _rt.USDO ?? { address: '0x4c95c850D6C89775791B801fDc7ED739702a8811' as Address, name: 'OmeSwap USD', symbol: 'USDO', decimals: 6 },
+  // OmeSwap native tokens (OmE / USDO) appear here once added to the active
+  // chain's `tokens` in lib/chain-registry/chains/hashkey.ts after deployment.
 }
 
 export const TOKENS = TOKEN_ADDRESSES

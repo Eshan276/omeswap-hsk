@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       {
         role: "system",
         content: `You are an expert trading bot builder assistant for a DEX (Decentralized Exchange). 
-Help users create automated trading strategies on Omega and Mantle using visual blocks on a flow canvas.
+Help users create automated trading strategies on Omega and HashKey Chain using visual blocks on a flow canvas.
 
 AVAILABLE NODE TYPES (use these exact values for the "type" field):
 DATA SOURCES:
@@ -98,7 +98,7 @@ CRITICAL RULES:
 - For stop-loss / take-profit, use type "condition" with threshold parameters
 
 When creating blocks, include relevant parameters:
-- token/pair: Token symbol (e.g., "WMNT", "ETH", "USDC")
+- token/pair: Token symbol (e.g., "WHSK", "ETH", "USDC")
 - amount: Number amount
 - price/threshold: Price or threshold value
 - interval/period: Time interval or period
@@ -116,11 +116,11 @@ Example block:
 {
   "type": "swap",
   "subType": "buy",
-  "label": "Buy WMNT",
-  "description": "Swap USDC for WMNT",
+  "label": "Buy WHSK",
+  "description": "Swap USDT for WHSK",
   "parameters": [
     {"name": "tokenIn", "value": "USDC", "type": "text"},
-    {"name": "tokenOut", "value": "WMNT", "type": "text"},
+    {"name": "tokenOut", "value": "WHSK", "type": "text"},
     {"name": "amount", "value": 100, "type": "number"}
   ]
 }
@@ -144,7 +144,7 @@ Valid examples:
 
 Respond with helpful explanations and generate appropriate blocks when users ask to create strategies.
 If user asks for a complete strategy, provide 3-6 connected blocks that form a working flow.
-This is an Omega DeFi app on Mantle — default to WMNT/USDC strategies when the user does not specify a pair.`,
+This is an Omega DeFi app on HashKey Chain — default to WHSK/USDT strategies when the user does not specify a pair.`,
       },
     ];
 

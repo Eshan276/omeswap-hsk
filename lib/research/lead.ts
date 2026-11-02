@@ -409,7 +409,7 @@ function taskContext(request: ResearchRequest): Record<string, unknown> {
   if (request.amountUsd != null) ctx.amountUsd = request.amountUsd
   if (request.horizon) ctx.horizon = request.horizon
   if (request.riskTolerance) ctx.riskTolerance = request.riskTolerance
-  ctx.chain = request.chain ?? 'Mantle'
+  ctx.chain = request.chain ?? 'HashKey Chain'
   return ctx
 }
 
@@ -642,7 +642,7 @@ function requestFacts(request: ResearchRequest): string {
     `Budget: ${request.amountUsd != null ? `$${request.amountUsd}` : '(none)'}. ` +
     `Horizon: ${request.horizon ?? '(none)'}. ` +
     `Risk tolerance: ${request.riskTolerance ?? '(unspecified)'}. ` +
-    `Chain: ${request.chain ?? 'Mantle'}.`
+    `Chain: ${request.chain ?? 'HashKey Chain'}.`
   )
 }
 

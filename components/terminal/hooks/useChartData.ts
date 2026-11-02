@@ -11,7 +11,7 @@ export function useChartData() {
   const activeSymbol = useTerminalStore((s) => s.activeSymbol);
 
   // Live pool reserves + trades for the active market, pushed from the
-  // realtime-service (block-time on Mantle). Feeds DepthTile / TradesTile via
+  // realtime-service (block-time on HashKey Chain). Feeds DepthTile / TradesTile via
   // the chart store. Candles below still come from Binance/CoinGecko.
   useRealtimeTerminalFeed(activeSymbol.symbol);
   const interval = useChartStore((s) => s.interval);

@@ -10,7 +10,7 @@
  *
  * Router dispatch (by the chain's primary router type in the registry):
  *   type 'uniswapV2' → UniswapV2 `swapExactTokensForTokens`
- *   type 'custom'    → Uniswap V3 `exactInputSingle` (e.g. FusionX V3 on Mantle)
+ *   type 'custom'    → Uniswap V3 `exactInputSingle` (e.g. HSKSwap on HashKey Chain)
  *
  * Emits:
  *   agent.thinking      — start
@@ -30,7 +30,7 @@ import type { RunEvent, RiskSizing } from '@/lib/ats/types'
 import { getOrCreateAgentWallet } from '@/lib/agent-wallet/manager'
 import { getChainConfig } from '@/lib/chain-registry'
 import { ERC20_ABI } from '@/lib/uniswap/constants'
-import { executeFusionXAgentSwap } from '@/lib/dex/fusionx'
+import { executeHSKSwapAgentSwap } from '@/lib/dex/hskswap'
 
 // ── Result type ───────────────────────────────────────────────────────────────
 
@@ -112,8 +112,8 @@ const TICKER_ALIAS: Record<string, string> = {
   ETH: 'WETH',
   ETHER: 'WETH',
   BITCOIN: 'WBTC',
-  MNT: 'WMNT',
-  MANTLE: 'WMNT',
+  HSK: 'WHSK',
+  HASHKEY: 'WHSK',
 }
 
 function resolveTokenSymbol(ticker: string): string {
@@ -188,11 +188,11 @@ async function executeV3Swap(
 
   const amountIn = parseUnits(Math.min(amountInUsd, balance).toFixed(tokenIn.decimals), tokenIn.decimals)
 
-  // Quote (best fee tier) → approve → exactInputSingle, via the FusionX V3 adapter.
+  // Quote (best fee tier) → approve → exactInputSingle, via the HSKSwap adapter.
   // The adapter derives amountOutMinimum from a live QuoterV2 quote, so it is
   // correct for any decimal/price ratio (unlike a naive 1:1 minimum).
   try {
-    const result = await executeFusionXAgentSwap({
+    const result = await executeHSKSwapAgentSwap({
       account: agentWallet.account,
       chain: chainConfig.chain,
       rpcUrl,
@@ -287,7 +287,7 @@ async function executeV2Swap(
       tx_hash: null, status: 'failed',
       amount_in_usd: amountInUsd, token_in: tokenIn.symbol, token_out: tokenOut.symbol,
       chain_id: chainConfig.chain.id,
-      error: `Insufficient ${tokenIn.symbol} balance on Mantle chain.`,
+      error: `Insufficient ${tokenIn.symbol} balance on HashKey Chain.`,
     }
   }
 
@@ -339,7 +339,7 @@ async function executeV2Swap(
  * @param decision   "BUY" or "SELL"
  * @param sizing     RiskSizing output from the Risk Agent
  * @param userWallet Authenticated user's wallet address
- * @param chainId    Target chain (default: Mantle = 5000/5003)
+ * @param chainId    Target chain (default: HashKey Chain = 177/133)
  */
 export async function runExecutionAgent(
   ticker: string,

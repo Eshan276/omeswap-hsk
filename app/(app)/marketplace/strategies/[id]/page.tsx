@@ -750,7 +750,7 @@ export default function StrategyDetailPage() {
             </div>
             {data.currentVersion?.zerog_root_hash && (
               <div className="flex justify-between items-start gap-2">
-                <span className="text-zinc-500 shrink-0">Mantle Hash</span>
+                <span className="text-zinc-500 shrink-0">0G Hash</span>
                 <span className="font-mono text-[10px] text-zinc-500 truncate">
                   {data.currentVersion.zerog_root_hash.slice(0, 20)}…
                 </span>

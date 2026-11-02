@@ -87,7 +87,7 @@ export const tokenAuditTool: ResearchTool = {
   parameters: {
     type: 'object',
     properties: {
-      token: { type: 'string', description: 'Token symbol or id, e.g. BTC, ETH, MNT.' },
+      token: { type: 'string', description: 'Token symbol or id, e.g. BTC, ETH, HSK.' },
     },
     required: ['token'],
     additionalProperties: false,

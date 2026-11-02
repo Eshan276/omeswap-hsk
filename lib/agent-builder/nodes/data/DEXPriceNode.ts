@@ -2,7 +2,7 @@ import { BaseNode } from '../BaseNode'
 import type { ConfigField, ExecutionContext, HandleDef } from '@/types/agent-builder-canvas'
 import { ethers } from 'ethers'
 import { getChainConfig, getDefaultChainId } from '@/lib/chain-registry'
-import { FUSIONX_DEX_NAME, FUSIONX_FEE_TIERS } from '@/lib/dex/fusionx'
+import { HSKSWAP_DEX_NAME, HSKSWAP_FEE_TIERS } from '@/lib/dex/hskswap'
 
 const ROUTER_ABI = [
   'function getAmountsOut(uint amountIn, address[] memory path) public view returns (uint[] memory amounts)',
@@ -13,7 +13,7 @@ const QUOTER_V2_ABI = [
 
 const _config = getChainConfig(getDefaultChainId())
 const _dexNames = _config.dexRouters.map((r) => r.name)
-const _defaultDex = _dexNames[0] ?? FUSIONX_DEX_NAME
+const _defaultDex = _dexNames[0] ?? HSKSWAP_DEX_NAME
 const _tokenSymbols = Object.keys(_config.tokens)
 
 function normalizeTokenKey(value: string) {
@@ -25,7 +25,7 @@ function normalizeTokenKey(value: string) {
 export class DEXPriceNode extends BaseNode {
   readonly type = 'dex_price'
   readonly label = 'DEX Price'
-  readonly description = `Gets swap quote from ${_dexNames.join(' or ') || FUSIONX_DEX_NAME}`
+  readonly description = `Gets swap quote from ${_dexNames.join(' or ') || HSKSWAP_DEX_NAME}`
   readonly icon = 'ArrowLeftRight'
   readonly category = 'data' as const
   readonly color = 'border-blue-500'
@@ -40,7 +40,7 @@ export class DEXPriceNode extends BaseNode {
       key: 'dex',
       label: 'DEX',
       type: 'select',
-      options: _dexNames.length ? _dexNames : [FUSIONX_DEX_NAME],
+      options: _dexNames.length ? _dexNames : [HSKSWAP_DEX_NAME],
       default: _defaultDex,
     },
     {
@@ -48,7 +48,7 @@ export class DEXPriceNode extends BaseNode {
       label: 'Token In',
       type: 'select',
       options: _tokenSymbols,
-      default: 'WMNT',
+      default: 'WHSK',
     },
     {
       key: 'tokenOut',
@@ -70,7 +70,7 @@ export class DEXPriceNode extends BaseNode {
     context: ExecutionContext
   ): Promise<Record<string, unknown>> {
     const dex = (this.config.dex as string) || _defaultDex
-    const tokenInKey = normalizeTokenKey((this.config.tokenIn as string) || 'WMNT')
+    const tokenInKey = normalizeTokenKey((this.config.tokenIn as string) || 'WHSK')
     const tokenOutKey = normalizeTokenKey((this.config.tokenOut as string) || 'USDC')
     const amountIn = (this.config.amountIn as number) || 1
     const inToken = _config.tokens[tokenInKey]
@@ -88,11 +88,11 @@ export class DEXPriceNode extends BaseNode {
     const provider = context.provider as ethers.BrowserProvider
     const amountInWei = ethers.parseUnits(amountIn.toString(), inToken.decimals)
 
-    // FusionX V3 (or any custom V3 router): probe fee tiers via QuoterV2.
+    // HSKSwap (or any custom V3 router): probe fee tiers via QuoterV2.
     if (routerEntry.type === 'custom' && routerEntry.quoterAddress) {
       const quoter = new ethers.Contract(routerEntry.quoterAddress, QUOTER_V2_ABI, provider)
       let bestOut = 0n
-      for (const fee of FUSIONX_FEE_TIERS) {
+      for (const fee of HSKSWAP_FEE_TIERS) {
         try {
           const res = await quoter.quoteExactInputSingle.staticCall([
             inToken.address,
@@ -107,7 +107,7 @@ export class DEXPriceNode extends BaseNode {
           /* no pool at this fee tier */
         }
       }
-      if (bestOut <= 0n) throw new Error(`No FusionX pool for ${inToken.symbol}/${outToken.symbol}`)
+      if (bestOut <= 0n) throw new Error(`No HSKSwap pool for ${inToken.symbol}/${outToken.symbol}`)
       const amountOut = parseFloat(ethers.formatUnits(bestOut, outToken.decimals))
       const price = amountOut / amountIn
       context.addLog(`[DEXPrice] 1 ${inToken.symbol} = ${price} ${outToken.symbol} on ${dex}`)

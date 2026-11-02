@@ -162,8 +162,8 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
   {
     id: 'tpl_dca',
     name: 'DCA Bot',
-    description: 'Swaps a fixed USDC amount to WMNT every hour on FusionX — no conditions, pure dollar-cost averaging.',
-    tags: ['trading', 'swap', 'mantle', 'dca'],
+    description: 'Swaps a fixed USDT amount to WHSK every hour on HSKSwap — no conditions, pure dollar-cost averaging.',
+    tags: ['trading', 'swap', 'hashkey', 'dca'],
     nodes: [
       {
         id: 'schedule_trigger_1', type: 'avaxNode', position: { x: -200, y: 0 },
@@ -184,7 +184,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     ],
     configs: {
       schedule_trigger_1: { interval: 3600, maxRuns: 0 },
-      swap_2: { dex: 'fusionx_v3', tokenIn: 'USDC', tokenOut: 'WMNT', amountIn: 10, slippage: 0.5 },
+      swap_2: { dex: 'hskswap', tokenIn: 'USDT', tokenOut: 'WHSK', amountIn: 10, slippage: 0.5 },
       notification_3: { message: 'DCA swap executed!', type: 'toast' },
     },
   },

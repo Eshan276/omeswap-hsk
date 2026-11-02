@@ -1,4 +1,5 @@
-import { DEX_MARKETS, getDexMarketConfig, type DexMarketConfig } from "./markets";
+import { DEX_MARKETS, getDexMarketConfig, isHashKeyNetwork, type DexMarketConfig } from "./markets";
+import { readOnchainPool } from "./onchain-pool";
 import type { DexCandle, DexDepth, DexDepthRow, DexMarket, DexTrade } from "./types";
 
 type GeckoPoolResponse = {
@@ -94,7 +95,17 @@ async function fetchFromRealtimeService<T>(path: string): Promise<T | null> {
 
 export async function getDexMarkets(): Promise<DexMarket[]> {
   const cached = await fetchFromRealtimeService<{ markets: DexMarket[] }>("/markets");
-  if (cached?.markets?.length) return cached.markets;
+  if (cached?.markets?.length) {
+    // The service only prices HashKey markets on its own network; read any it
+    // could not price (source "fallback") straight from the pool instead.
+    return Promise.all(
+      cached.markets.map((market) =>
+        market.source === "fallback" && isHashKeyNetwork(market.network)
+          ? getOnchainMarket(getDexMarketConfig(market.id))
+          : market,
+      ),
+    );
+  }
 
   const markets = await Promise.all(DEX_MARKETS.map((market) => getDexMarket(market.id)));
   return markets;
@@ -104,10 +115,16 @@ export async function getDexMarket(id: string | null | undefined): Promise<DexMa
   const config = getDexMarketConfig(id);
 
   const cached = await fetchFromRealtimeService<{ market: DexMarket }>(`/markets?id=${encodeURIComponent(config.id)}`);
-  if (cached?.market) return cached.market;
+  if (cached?.market && !(cached.market.source === "fallback" && isHashKeyNetwork(config.network))) {
+    return cached.market;
+  }
 
   if (config.kind === "perp") {
     return getBinanceMarket(config);
+  }
+
+  if (isHashKeyNetwork(config.network)) {
+    return getOnchainMarket(config);
   }
 
   try {
@@ -185,7 +202,7 @@ export async function getDexCandles(
     if (candles.length) return { candles, isFallback: false };
   }
 
-  if (config.kind === "perp") {
+  if (config.kind === "perp" || isHashKeyNetwork(config.network)) {
     return { candles: fallbackCandles(config, interval, limit), isFallback: true };
   }
 
@@ -228,7 +245,7 @@ export async function getDexTrades(id: string | null | undefined): Promise<DexTr
   const cached = await fetchFromRealtimeService<{ trades: DexTrade[] }>(`/trades?market=${encodeURIComponent(config.id)}`);
   if (cached?.trades?.length) return cached.trades;
 
-  if (config.kind === "perp") {
+  if (config.kind === "perp" || isHashKeyNetwork(config.network)) {
     return fallbackTrades(config);
   }
 
@@ -312,6 +329,24 @@ function marketStaticFields(config: DexMarketConfig) {
     color: config.color,
     executionVenue: config.executionVenue,
   };
+}
+
+/** HSKSwap pools: spot price + TVL from the pool contract (no indexer covers them). */
+async function getOnchainMarket(config: DexMarketConfig): Promise<DexMarket> {
+  try {
+    const pool = await readOnchainPool(config);
+    if (!(pool.priceInQuote > 0)) throw new Error("Pool has no price");
+    return {
+      ...marketStaticFields(config),
+      ...config.fallback,
+      priceUsd: pool.priceInQuote,
+      liquidityUsd: pool.liquidityInQuote,
+      source: "onchain",
+      updatedAt: new Date().toISOString(),
+    };
+  } catch {
+    return fallbackMarket(config);
+  }
 }
 
 function fallbackMarket(config: DexMarketConfig): DexMarket {

@@ -24,7 +24,7 @@ export interface DexRouter {
 export interface ChainConfig {
   /** viem Chain object (id, name, nativeCurrency, rpcUrls, etc.) */
   chain: Chain
-  /** Wrapped native token address (WAVAX, WETH, …) */
+  /** Wrapped native token address (WHSK, WETH, …) */
   nativeWrapped: Address
   /**
    * Intermediate hop addresses for V1 multi-hop routing.

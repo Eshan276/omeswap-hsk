@@ -5,8 +5,8 @@ import { AddLiquidityCard } from "@/components/trade/AddLiquidityCard";
 import { PoolComparisonPanel } from "@/components/trade/PoolComparisonPanel";
 
 export default function LiquidityPage() {
-  const [token0, setToken0] = useState("OmE");
-  const [token1, setToken1] = useState("USDO");
+  const [token0, setToken0] = useState("WHSK");
+  const [token1, setToken1] = useState("USDT");
 
   return (
     <div className="min-h-screen bg-transparent relative z-10">
@@ -15,7 +15,7 @@ export default function LiquidityPage() {
           <section className="space-y-4">
             <div>
               <h1 className="text-2xl font-semibold">Add Liquidity</h1>
-              <p className="text-sm text-muted-foreground">Provide liquidity to Omega pools on Mantle</p>
+              <p className="text-sm text-muted-foreground">Provide liquidity to Omega pools on HashKey Chain</p>
             </div>
             <AddLiquidityCard onTokensChange={(t0, t1) => { setToken0(t0); setToken1(t1); }} />
           </section>

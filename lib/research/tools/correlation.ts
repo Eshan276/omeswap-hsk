@@ -83,7 +83,7 @@ export const correlationTool: ResearchTool = {
       tokens: {
         type: 'array',
         items: { type: 'string' },
-        description: 'Tickers to analyse, e.g. ["BTC","ETH","WMNT"] (1–6).',
+        description: 'Tickers to analyse, e.g. ["BTC","ETH","WHSK"] (1–6).',
       },
     },
     required: ['tokens'],

@@ -21,8 +21,8 @@ interface AddLiquidityCardProps {
 
 export function AddLiquidityCard({ onTokensChange }: AddLiquidityCardProps) {
   const { isConnected, chain } = useWallet();
-  const [token0Symbol, setToken0Symbol] = useState<string>('OmE');
-  const [token1Symbol, setToken1Symbol] = useState<string>('USDO');
+  const [token0Symbol, setToken0Symbol] = useState<string>('WHSK');
+  const [token1Symbol, setToken1Symbol] = useState<string>('USDT');
 
   const {
     amount0,
@@ -99,7 +99,7 @@ export function AddLiquidityCard({ onTokensChange }: AddLiquidityCardProps) {
       <div className="swap-card w-full max-w-md p-8 text-center">
         <h3 className="text-xl font-semibold mb-4 text-destructive">Wrong Network</h3>
         <p className="text-muted-foreground mb-6">
-          Please switch to Mantle Sepolia Testnet
+          Please switch to HashKey Chain Testnet
         </p>
       </div>
     );

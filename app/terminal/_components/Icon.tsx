@@ -4,8 +4,8 @@ import { useState } from "react";
 import Image from "next/image";
 
 const TOKEN_LOGOS: Record<string, string> = {
-  WMNT: "https://cryptologos.cc/logos/mantle-mnt-logo.png?v=035",
-  MNT: "https://cryptologos.cc/logos/mantle-mnt-logo.png?v=035",
+  WHSK: "https://coin-images.coingecko.com/coins/images/29779/small/HSKlogo.jpg?1719445510",
+  HSK: "https://coin-images.coingecko.com/coins/images/29779/small/HSKlogo.jpg?1719445510",
   WETH: "https://cryptologos.cc/logos/ethereum-eth-logo.png?v=035",
   ETH: "https://cryptologos.cc/logos/ethereum-eth-logo.png?v=035",
   USDC: "https://cryptologos.cc/logos/usd-coin-usdc-logo.png?v=035",

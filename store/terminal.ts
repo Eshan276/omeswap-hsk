@@ -8,7 +8,7 @@ const CHAIN_CONFIG = getChainConfig(getDefaultChainId());
 const CHAIN_NAME = CHAIN_CONFIG.chain.name;
 
 export type ActiveSymbol = {
-  /** Display name of the active chain (e.g. "Mantle") — sourced from the chain registry */
+  /** Display name of the active chain (e.g. "HashKey Chain") — sourced from the chain registry */
   chain: string;
   address: Address;
   symbol: string;

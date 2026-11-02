@@ -77,8 +77,8 @@ function jsonError(status: number, error: string): Response {
 
 /**
  * Best-effort estimate of the agent wallet balance in USD.
- * For Mantle we don't have a live native-token price oracle here, so we use a
- * conservative placeholder ($1 per MNT). On Ethereum mainnet we use $3,000/ETH.
+ * For HashKey Chain we don't have a live native-token price oracle here, so we
+ * use a conservative placeholder (~$0.09 per HSK on mainnet, $1 elsewhere). On Ethereum mainnet we use $3,000/ETH.
  * Failures are swallowed and return 0 so Kelly sizing gracefully falls back.
  */
 async function estimateAgentBalanceUSD(agentAddress: string, chainId: number): Promise<number> {
@@ -90,8 +90,8 @@ async function estimateAgentBalanceUSD(agentAddress: string, chainId: number): P
     })
     const raw = await client.getBalance({ address: agentAddress as `0x${string}` })
     const native = parseFloat(formatEther(raw))
-    // ETH mainnet: rough $3k/ETH; Mantle mainnet: $0.80 MNT; others: $1 placeholder
-    const priceUSD = chainId === 1 ? 3000 : chainId === 5000 ? 0.8 : 1
+    // ETH mainnet: rough $3k/ETH; HashKey mainnet: ~$0.09 HSK; others: $1 placeholder
+    const priceUSD = chainId === 1 ? 3000 : chainId === 177 ? 0.09 : 1
     return native * priceUSD
   } catch {
     return 0

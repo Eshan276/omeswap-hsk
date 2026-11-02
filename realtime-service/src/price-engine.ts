@@ -1,7 +1,7 @@
 /**
  * USD price derivation. Stables anchor at $1; every other token is priced by
  * pathing through the deepest-liquidity pool to an already-priced token (direct
- * to a stable, or via WMNT). Recomputed on each swap — cheap for a small token
+ * to a stable, or via WHSK). Recomputed on each swap — cheap for a small token
  * set. This replaces the 5-min CoinGecko feed with the pool's executable price.
  */
 
@@ -43,7 +43,7 @@ export function computeUsdPrices(): UsdPrices {
 
   const pools = allPools().filter(isUsable);
 
-  // Resolve remaining tokens by repeated passes (handles token→WMNT→stable).
+  // Resolve remaining tokens by repeated passes (handles token→WHSK→stable).
   for (let pass = 0; pass < TOKEN_LIST.length; pass++) {
     let changed = false;
     for (const t of TOKEN_LIST) {

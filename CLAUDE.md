@@ -10,13 +10,13 @@ bun run dev          # or: npm run dev
 bun run build
 bun run lint
 
-# Smart contract operations (self-contained hardhat project in 0g-contract/)
-cd 0g-contract && npm install
+# Smart contract operations (self-contained hardhat project in contract/)
+cd contract && npm install
 npx hardhat compile
 npx hardhat test
-npx hardhat run scripts/deployTokens.js  --network mantleSepolia  # deploy test tokens
-npx hardhat run scripts/deploy.js        --network mantleSepolia  # deploy pools + router
-npx hardhat run scripts/addLiquidity.js  --network mantleSepolia  # seed liquidity
+npx hardhat run scripts/deployTokens.js  --network hashkeyTestnet  # deploy test tokens
+npx hardhat run scripts/deploy.js        --network hashkeyTestnet  # deploy pools + router
+npx hardhat run scripts/addLiquidity.js  --network hashkeyTestnet  # seed liquidity
 ```
 
 ## Environment
@@ -27,10 +27,10 @@ NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=  # required — from cloud.walletconnect.c
 
 ## Architecture
 
-**Omeswap** is a DEX and autonomous agent platform on **Mantle** (EVM-compatible L2, chainId 5000 mainnet / 5003 Sepolia testnet) using Next.js 15 App Router. The repo has no tests; validate with `bun run build` and visual inspection.
+**Omeswap** is a DEX and autonomous agent platform on **HashKey Chain** (EVM-compatible L2, chainId 177 mainnet / 133 testnet), built for the HashKey "AI Agent Trading" track using Next.js 15 App Router. The repo has no tests; validate with `bun run build` and visual inspection.
 
-The **trading chain is Mantle**; swaps route through Mantle DEXes (FusionX V3, Agni Finance, Merchant Moe). Separately, the app consumes 0G's decentralized AI/data services as **external infrastructure** (independent of the trading chain — see `lib/zerog/config.ts`):
-- **Mantle Chain** — EVM execution layer for all trading (chainId 5000 / 5003), config in `lib/chain-registry/chains/mantle.ts`
+The **trading chain is HashKey Chain**; swaps route through **HSKSwap** (https://app.hskswap.com, a Uniswap V3 fork — factory + SwapRouter02 + QuoterV2). Separately, the app consumes 0G's decentralized AI/data services as **external infrastructure** (independent of the trading chain — see `lib/zerog/config.ts`):
+- **HashKey Chain** — EVM execution layer for all trading (chainId 177 / 133), config in `lib/chain-registry/chains/hashkey.ts`
 - **0G Storage** — decentralized KV + Log blobs for persistent agent memory (`lib/zerog/storage.ts`)
 - **0G Compute** — decentralized AI inference for agent reasoning (`lib/zerog/compute.ts`), models: `qwen3-8b`, `qwen3.6-plus` (sealed ZK), `GLM-5-FP8`
 - **0G DA** — data availability layer for high-throughput agent output (`lib/zerog/da.ts`)
@@ -44,7 +44,7 @@ The **trading chain is Mantle**; swaps route through Mantle DEXes (FusionX V3, A
 | `(landing)` | `/` | Marketing landing page |
 | `(userform)` | `/onboarding` | Wallet-based onboarding |
 
-The `(app)` layout wraps everything in the wallet provider (`components/providers/wallet-provider.tsx`, connects to Mantle via the chain registry) → `OnboardingGuard` → `ChatProvider`. `OnboardingGuard` redirects new wallets to onboarding; `DisconnectOverlay` handles wallet-switch detection.
+The `(app)` layout wraps everything in the wallet provider (`components/providers/wallet-provider.tsx`, connects to HashKey Chain via the chain registry) → `OnboardingGuard` → `ChatProvider`. `OnboardingGuard` redirects new wallets to onboarding; `DisconnectOverlay` handles wallet-switch detection.
 
 ### API Routes (`app/api/`)
 
@@ -69,11 +69,11 @@ Single source of truth for all chain config (RPC URLs, contract addresses, token
 
 To add a new chain: create `lib/chain-registry/chains/<chain>.ts` exporting a `ChainConfig`, import it in `lib/chain-registry/index.ts`, and add to `REGISTRY`. The wallet provider, swap hooks, and agent nodes pick it up automatically.
 
-Currently registered: **Mantle** (chainId 5000 mainnet / 5003 Sepolia testnet, selected via `NEXT_PUBLIC_MANTLE_NETWORK`). Config file: `lib/chain-registry/chains/mantle.ts`.
+Currently registered: **HashKey Chain** — mainnet 177 and testnet 133 are both registered with the wallet; the default trading chain is testnet unless `NEXT_PUBLIC_HASHKEY_NETWORK=mainnet`. Config file: `lib/chain-registry/chains/hashkey.ts`.
 
 ### 0G SDK Layer (`lib/zerog/`)
 
-External AI/data infrastructure — **intentionally remains on 0G** regardless of the Mantle trading chain (see `lib/zerog/config.ts`). Three wrappers for the 0G protocol primitives:
+External AI/data infrastructure — **intentionally remains on 0G** regardless of the HashKey trading chain (see `lib/zerog/config.ts`). Three wrappers for the 0G protocol primitives:
 - **`storage.ts`** — `saveAgentMemory()`, `loadAgentMemory()`, `appendLog()` — persistent agent memory on 0G Storage
 - **`compute.ts`** — `computeInference()`, `agentReason()`, `streamComputeInference()` — AI inference via 0G Compute
 - **`da.ts`** — `submitToDA()`, `postSwarmMessage()`, `postInferenceResult()` — data availability via 0G DA
@@ -81,9 +81,11 @@ External AI/data infrastructure — **intentionally remains on 0G** regardless o
 
 ### Contract Layer (`contracts/`)
 
-`contracts/config.ts` is a backward-compatible shim that re-exports from the chain registry. The OmeSwap custom AMM (`MultiTokenLiquidityPools` + `MultiHopSwapRouter`, source in `0g-contract/`) deploys to Mantle Sepolia — set `omeswapPools` and `omeswapRouter` in the testnet branch of `lib/chain-registry/chains/mantle.ts` after deploying. The live app does not require them: swaps route through the third-party Mantle DEX routers below.
+`contracts/config.ts` is a backward-compatible shim that re-exports from the chain registry. The OmeSwap custom AMM (`MultiTokenLiquidityPools` + `MultiHopSwapRouter`, source in `contract/`) is not deployed on HashKey yet — after `--network hashkeyTestnet`, set `omeswapPools` and `omeswapRouter` in `hashkeyTestnetConfig` in `lib/chain-registry/chains/hashkey.ts`. The live app does not require them: swaps route through HSKSwap.
 
-Mantle DEX routers are configured in the chain registry (`fusionx_v3`, `agni_v3`, `merchant_moe`).
+HSKSwap is the only DEX router (`hskswap`, type `custom`). Its adapter is `lib/dex/hskswap.ts`. **SwapRouter02's `exactInputSingle` / `exactInput` structs have no `deadline` field** — using the original V3 SwapRouter ABI will revert. Enabled fee tiers: 100 / 500 / 3000 / 10000.
+
+HashKey markets (`lib/dex/markets.ts`, network `hashkey` / `hashkey-testnet`) are priced on-chain from pool `slot0` (`lib/dex/onchain-pool.ts`); GeckoTerminal does not index HSKSwap. Mainnet liquidity sits in WHSK/USDT, USDT/WETH and USDT/WBTC (0.3%); USDC.e is near-empty, so USDT is the default quote/hub.
 
 ### State Management (`store/`)
 
@@ -148,7 +150,7 @@ A knowledge graph of this codebase lives in `graphify-out/`. Before answering ar
 ## Key Conventions
 
 - Path alias `@/` maps to the project root — use it everywhere instead of relative imports.
-- All contract addresses must come from the chain registry (`lib/chain-registry/chains/mantle.ts`), not be hardcoded in components or hooks.
+- All contract addresses must come from the chain registry (`lib/chain-registry/chains/hashkey.ts`), not be hardcoded in components or hooks.
 - 0G protocol access (Storage, Compute, DA) must go through `lib/zerog/` — never call 0G endpoints directly in components.
 - Node.js v25+ `localStorage` shim is injected via webpack BannerPlugin in `next.config.ts` — do not add another localStorage polyfill.
 - `export const dynamic = "force-dynamic"` is set on the `(app)` layout to prevent static rendering of wallet-dependent pages.

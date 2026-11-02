@@ -14,14 +14,13 @@ import { MAINNET_TOKENS } from "@/contracts/config";
 import { ERC20ABI } from "@/contracts/abis";
 import { getChainConfig, getDefaultChainId } from "@/lib/chain-registry";
 import {
-  FUSIONX_DEX_ID,
-  FUSIONX_V3_ROUTER_ABI,
-  FUSIONX_V3_ROUTER_EXACT_INPUT_ABI,
+  HSKSWAP_DEX_ID,
+  HSKSWAP_ROUTER_ABI,
+  HSKSWAP_ROUTER_EXACT_INPUT_ABI,
   isPlaceholderAddress,
-  quoteFusionXBestTier,
-  quoteFusionXMultiHop,
-} from "@/lib/dex/fusionx";
-import { LB_ROUTER_ABI, quoteLBBestPath } from "@/lib/dex/liquidity-book";
+  quoteHSKSwapBestTier,
+  quoteHSKSwapMultiHop,
+} from "@/lib/dex/hskswap";
 import { useTransactionStore } from "@/store/transaction-store";
 
 const OMESWAP_DEX_ID = "omeswap" as const;
@@ -116,14 +115,11 @@ export interface DexQuote {
   amountOut: bigint;
   amountOutFormatted: string;
   path: Address[];
-  // V2-specific — used to build the Path struct for the swap
-  v2BinSteps?: bigint[];
-  v2Versions?: number[];
   // V3-specific — the fee tier (hundredths of a bip) the swap must use for a
   // single-hop `exactInputSingle`. Unset when `v3Path` is set instead.
   v3Fee?: number;
   // V3-specific — packed-bytes multi-hop path for `exactInput`, set when a
-  // route through a hub token (e.g. tokenIn -> WMNT -> tokenOut) beats the
+  // route through a hub token (e.g. tokenIn -> USDT -> tokenOut) beats the
   // direct pool.
   v3Path?: Hex;
   isBest: boolean;
@@ -148,9 +144,8 @@ export function useDexAggregator(
   const publicClient = usePublicClient({ chainId });
   const tokenIn = MAINNET_TOKENS[tokenInSymbol];
   const tokenOut = MAINNET_TOKENS[tokenOutSymbol];
-  // Uniswap-V3-shaped "custom" routers (FusionX V3, Agni Finance, ...) — all
-  // share the same QuoterV2 / SwapRouter ABI shape, so they're quoted and
-  // executed generically via the FusionX adapter's ABIs.
+  // Uniswap-V3-shaped "custom" routers (HSKSwap) — QuoterV2 + SwapRouter02,
+  // quoted and executed generically via the HSKSwap adapter's ABIs.
   const v3CustomDexConfig = chainConfig.dexRouters
     .filter((r) => r.type === 'custom' && r.quoterAddress)
     .map((r) => ({ dex: r.id as DexSource, dexName: r.name, router: r.routerAddress, quoter: r.quoterAddress as Address }))
@@ -165,25 +160,19 @@ export function useDexAggregator(
   const v1DexConfig = chainConfig.dexRouters
     .filter(r => r.type === 'uniswapV2')
     .map(r => ({ dex: r.id as DexSource, dexName: r.name, router: r.routerAddress }));
-  const tjV2 = chainConfig.dexRouters.find(r => r.type === 'traderJoeV2');
   const activeV1DexConfig = v1DexConfig.filter(({ router }) => !isPlaceholderAddress(router));
-  const hasConfiguredTjV2 =
-    !!tjV2 &&
-    !isPlaceholderAddress(tjV2.routerAddress) &&
-    !isPlaceholderAddress(tjV2.quoterAddress);
   const omeswapPoolsAddr = chainConfig.omeswapPools as Address | undefined;
   const omeswapRouterAddr = chainConfig.omeswapRouter as Address | undefined;
   const hasOmeswapRouter =
     !isPlaceholderAddress(omeswapPoolsAddr) && !isPlaceholderAddress(omeswapRouterAddr);
   const hasConfiguredRouters =
-    activeV1DexConfig.length > 0 || hasConfiguredTjV2 || hasV3CustomRouters || hasOmeswapRouter;
+    activeV1DexConfig.length > 0 || hasV3CustomRouters || hasOmeswapRouter;
 
   const [quotes, setQuotes] = useState<DexQuote[]>([]);
   const [selectedDex, setSelectedDex] = useState<DexSource>(() => {
     if (hasV3CustomRouters) return v3CustomDexConfig[0].dex;
     if (hasOmeswapRouter) return OMESWAP_DEX_ID;
-    if (hasConfiguredTjV2 && tjV2?.id) return tjV2.id as DexSource;
-    return (activeV1DexConfig[0]?.dex ?? v1DexConfig[0]?.dex ?? FUSIONX_DEX_ID) as DexSource;
+    return (activeV1DexConfig[0]?.dex ?? v1DexConfig[0]?.dex ?? HSKSWAP_DEX_ID) as DexSource;
   });
   const [isLoadingQuotes, setIsLoadingQuotes] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
@@ -198,7 +187,6 @@ export function useDexAggregator(
   const defaultSpender =
     (hasV3CustomRouters ? v3CustomDexConfig[0].router : undefined) ??
     (hasOmeswapRouter ? omeswapRouterAddr : undefined) ??
-    (hasConfiguredTjV2 ? tjV2?.routerAddress : undefined) ??
     activeV1DexConfig[0]?.router ??
     "0x0000000000000000000000000000000000000000";
   const approvalSpender: Address =
@@ -206,8 +194,6 @@ export function useDexAggregator(
       ? selectedV3CustomDex.router
       : selectedDex === OMESWAP_DEX_ID && hasOmeswapRouter && omeswapRouterAddr
       ? omeswapRouterAddr
-      : selectedDex === tjV2?.id && hasConfiguredTjV2
-      ? tjV2.routerAddress
       : (selectedDexConfig?.router ?? defaultSpender);
 
   // Balance query
@@ -289,20 +275,20 @@ export function useDexAggregator(
       const amountIn = parseUnits(amountInRaw, tokenIn.decimals);
       const newQuotes: DexQuote[] = [];
 
-      // --- Uniswap-V3-shaped "custom" router quotes (FusionX V3, Agni Finance, ...) ---
+      // --- Uniswap-V3-shaped "custom" router quotes (HSKSwap) ---
       // For each router, compare the direct pool against the best two-hop route
-      // through a hub token (WMNT/USDC/USDT) and keep whichever is better.
+      // through a hub token (USDT/WHSK) and keep whichever is better.
       if (hasV3CustomRouters) {
         for (const { dex, dexName, quoter } of v3CustomDexConfig) {
           try {
             const [direct, multiHop] = await Promise.all([
-              quoteFusionXBestTier(publicClient, {
+              quoteHSKSwapBestTier(publicClient, {
                 tokenIn: tokenIn.address,
                 tokenOut: tokenOut.address,
                 amountIn,
                 quoter,
               }),
-              quoteFusionXMultiHop(publicClient, {
+              quoteHSKSwapMultiHop(publicClient, {
                 tokenIn: tokenIn.address,
                 tokenOut: tokenOut.address,
                 amountIn,
@@ -338,29 +324,6 @@ export function useDexAggregator(
           } catch {
             /* no pool for this pair on this router */
           }
-        }
-      }
-
-      // --- TraderJoe V2 (Merchant Moe) quote — searches direct + hub-token paths ---
-      if (hasConfiguredTjV2 && tjV2?.quoterAddress) {
-        const lb = await quoteLBBestPath(publicClient, {
-          tokenIn: tokenIn.address,
-          tokenOut: tokenOut.address,
-          amountIn,
-          hubTokens: chainConfig.hubTokens,
-          quoter: tjV2.quoterAddress,
-        });
-        if (lb) {
-          newQuotes.push({
-            dex: tjV2.id,
-            dexName: tjV2.name,
-            amountOut: lb.amountOut,
-            amountOutFormatted: formatUnits(lb.amountOut, tokenOut.decimals),
-            path: lb.route,
-            v2BinSteps: lb.pairBinSteps,
-            v2Versions: lb.versions,
-            isBest: false,
-          });
         }
       }
 
@@ -470,7 +433,7 @@ export function useDexAggregator(
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [amountInRaw, tokenInSymbol, tokenOutSymbol, publicClient, hasConfiguredRouters, hasConfiguredTjV2, hasV3CustomRouters, hasOmeswapRouter]);
+  }, [amountInRaw, tokenInSymbol, tokenOutSymbol, publicClient, hasConfiguredRouters, hasV3CustomRouters, hasOmeswapRouter]);
 
   const needsApproval = (): boolean => {
     if (!hasConfiguredRouters) return false;
@@ -502,13 +465,12 @@ export function useDexAggregator(
     } else if (selectedV3CustomDex && selectedQuote.v3Path) {
       writeSwap({
         address: selectedV3CustomDex.router,
-        abi: FUSIONX_V3_ROUTER_EXACT_INPUT_ABI,
+        abi: HSKSWAP_ROUTER_EXACT_INPUT_ABI,
         functionName: "exactInput",
         args: [
           {
             path: selectedQuote.v3Path,
             recipient: address,
-            deadline,
             amountIn,
             amountOutMinimum: amountOutMin,
           },
@@ -518,7 +480,7 @@ export function useDexAggregator(
     } else if (selectedV3CustomDex) {
       writeSwap({
         address: selectedV3CustomDex.router,
-        abi: FUSIONX_V3_ROUTER_ABI,
+        abi: HSKSWAP_ROUTER_ABI,
         functionName: "exactInputSingle",
         args: [
           {
@@ -526,34 +488,10 @@ export function useDexAggregator(
             tokenOut: tokenOut.address,
             fee: selectedQuote.v3Fee ?? 3000,
             recipient: address,
-            deadline,
             amountIn,
             amountOutMinimum: amountOutMin,
             sqrtPriceLimitX96: 0n,
           },
-        ],
-        chainId,
-      });
-    } else if (
-      tjV2 &&
-      selectedDex === tjV2.id &&
-      selectedQuote.v2BinSteps &&
-      selectedQuote.v2Versions
-    ) {
-      writeSwap({
-        address: tjV2.routerAddress,
-        abi: LB_ROUTER_ABI,
-        functionName: "swapExactTokensForTokens",
-        args: [
-          amountIn,
-          amountOutMin,
-          {
-            pairBinSteps: selectedQuote.v2BinSteps,
-            versions: selectedQuote.v2Versions,
-            tokenPath: selectedQuote.path,
-          },
-          address,
-          deadline,
         ],
         chainId,
       });

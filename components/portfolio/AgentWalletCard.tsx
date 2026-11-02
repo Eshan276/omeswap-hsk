@@ -142,7 +142,7 @@ function SendToAgentDialog({
       try {
         await waitForTransactionReceipt(config, { hash, timeout: 60_000, pollingInterval: 3_000 });
       } catch {
-        // Mantle chain can be slow — tx was submitted, treat as success
+        // HashKey Chain can be slow — tx was submitted, treat as success
       }
       setStatus("sent");
       setAmount("");
@@ -229,7 +229,7 @@ export function AgentWalletCard() {
   const [fundOpen, setFundOpen] = useState(false);
   const [sweepResult, setSweepResult] = useState<string | null>(null);
   const resolvedChain = data ? getResolvedChain(data.chainId) : null;
-  const nativeSymbol = resolvedChain?.nativeCurrency.symbol ?? "MNT";
+  const nativeSymbol = resolvedChain?.nativeCurrency.symbol ?? "HSK";
   const explorerHref =
     data?.address ? getExplorerHref(data.address, data.chainId) : null;
 

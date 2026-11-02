@@ -36,7 +36,7 @@ export const assetDecisionTool: ResearchTool = {
     properties: {
       ticker: {
         type: 'string',
-        description: 'The single asset symbol to get a decision on, e.g. WMNT, BTC, ETH.',
+        description: 'The single asset symbol to get a decision on, e.g. WHSK, BTC, ETH.',
       },
     },
     required: ['ticker'],

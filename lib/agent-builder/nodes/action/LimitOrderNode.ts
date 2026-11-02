@@ -38,7 +38,7 @@ export class LimitOrderNode extends BaseNode {
       label: 'Token In',
       type: 'select',
       options: _tokenSymbols,
-      default: 'WMNT',
+      default: 'WHSK',
     },
     {
       key: 'tokenOut',

@@ -1,18 +1,19 @@
 /**
- * FusionX V3 adapter — Mantle's primary DEX execution path.
+ * HSKSwap adapter — HashKey Chain's DEX execution path.
  *
- * FusionX V3 is a Uniswap V3 fork (concentrated liquidity, multiple fee tiers).
- * The deployed SwapRouter (0x5989…797F) dispatches the original Uniswap V3
- * `exactInputSingle` selector 0x414bf389 — i.e. the params struct INCLUDES a
- * `deadline` field (verified against on-chain bytecode). This differs from the
- * SwapRouter02 / PancakeSwap "smart router" variants, which drop the deadline.
+ * HSKSwap is a Uniswap V3 fork (concentrated liquidity, fee tiers 100 / 500 /
+ * 3000 / 10000). Its router is **SwapRouter02**, whose `exactInputSingle`
+ * (selector 0x04e45aaf) and `exactInput` (0xb858183f) param structs have NO
+ * `deadline` field — verified against on-chain bytecode; the original V3
+ * SwapRouter selectors are absent. Deadlines are enforced, when needed, via
+ * `multicall(uint256 deadline, bytes[] data)`.
  *
  * Quotes come from the QuoterV2 (`quoteExactInputSingle`, struct param), which
  * is `nonpayable` and therefore must be called via eth_call (`simulateContract`),
  * never `readContract`.
  *
- * Addresses are sourced from the chain registry (`chains/mantle.ts`) — never
- * hardcode them elsewhere. This module mirrors the old 0G `jaine.ts` adapter.
+ * Addresses are sourced from the chain registry (`chains/hashkey.ts`) — never
+ * hardcode them elsewhere.
  */
 
 import {
@@ -26,18 +27,15 @@ import {
   type PublicClient,
 } from 'viem'
 import type { PrivateKeyAccount } from 'viem/accounts'
-import {
-  MANTLE_CHAIN_ID,
-  FUSIONX_V3_SWAP_ROUTER,
-  FUSIONX_V3_QUOTER_V2,
-} from '@/lib/chain-registry/chains/mantle'
+import { HASHKEY_CHAIN_ID, HSKSWAP } from '@/lib/chain-registry/chains/hashkey'
 
 // ── Identity ──────────────────────────────────────────────────────────────────
 
-export const FUSIONX_CHAIN_ID = MANTLE_CHAIN_ID
-export const FUSIONX_DEX_ID = 'fusionx_v3'
-export const FUSIONX_DEX_NAME = 'FusionX V3'
-export const FUSIONX_SWAP_URL = 'https://fusionx.finance/swap'
+export const HSKSWAP_CHAIN_ID = HASHKEY_CHAIN_ID
+export const HSKSWAP_DEX_ID = 'hskswap'
+export const HSKSWAP_DEX_NAME = 'HSKSwap'
+export const HSKSWAP_SWAP_URL = 'https://app.hskswap.com/swap'
+export const HSKSWAP_POOLS_URL = 'https://app.hskswap.com/positions'
 export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as const
 
 /** True for unset/zero/burn-style placeholder addresses (chain registry entries pending deployment). */
@@ -49,17 +47,16 @@ export function isPlaceholderAddress(address: Address | undefined): boolean {
 }
 
 /**
- * Candidate fee tiers, probed lowest→highest. Includes both the Uniswap-V3
- * lineage (3000) and the PancakeSwap-fork lineage (2500) so pool discovery
- * works regardless of which tiers the FusionX factory enabled. Tiers with no
- * pool simply revert in the quoter and are skipped.
+ * Fee tiers enabled on the HSKSwap factory (`feeAmountTickSpacing` != 0),
+ * probed lowest→highest. Tiers with no pool simply revert in the quoter and
+ * are skipped.
  */
-export const FUSIONX_FEE_TIERS = [100, 500, 2500, 3000, 10000] as const
-export type FusionXFeeTier = (typeof FUSIONX_FEE_TIERS)[number]
+export const HSKSWAP_FEE_TIERS = [100, 500, 3000, 10000] as const
+export type HSKSwapFeeTier = (typeof HSKSWAP_FEE_TIERS)[number]
 
 // ── ABIs ────────────────────────────────────────────────────────────────────
 
-export const FUSIONX_ERC20_ABI = [
+export const HSKSWAP_ERC20_ABI = [
   {
     inputs: [{ name: 'account', type: 'address' }],
     name: 'balanceOf',
@@ -90,7 +87,7 @@ export const FUSIONX_ERC20_ABI = [
 ] as const
 
 /** QuoterV2.quoteExactInputSingle — struct param, nonpayable (call via eth_call). */
-export const FUSIONX_QUOTER_V2_ABI = [
+export const HSKSWAP_QUOTER_V2_ABI = [
   {
     inputs: [
       {
@@ -117,8 +114,8 @@ export const FUSIONX_QUOTER_V2_ABI = [
   },
 ] as const
 
-/** SwapRouter.exactInputSingle — original Uniswap V3 shape WITH `deadline`. */
-export const FUSIONX_V3_ROUTER_ABI = [
+/** SwapRouter02.exactInputSingle — NO `deadline` field (selector 0x04e45aaf). */
+export const HSKSWAP_ROUTER_ABI = [
   {
     inputs: [
       {
@@ -127,7 +124,6 @@ export const FUSIONX_V3_ROUTER_ABI = [
           { name: 'tokenOut', type: 'address' },
           { name: 'fee', type: 'uint24' },
           { name: 'recipient', type: 'address' },
-          { name: 'deadline', type: 'uint256' },
           { name: 'amountIn', type: 'uint256' },
           { name: 'amountOutMinimum', type: 'uint256' },
           { name: 'sqrtPriceLimitX96', type: 'uint160' },
@@ -144,7 +140,7 @@ export const FUSIONX_V3_ROUTER_ABI = [
 ] as const
 
 /** QuoterV2.quoteExactInput — multi-hop, packed-bytes path (verified selector 0xcdca1753). */
-export const FUSIONX_QUOTER_V2_PATH_ABI = [
+export const HSKSWAP_QUOTER_V2_PATH_ABI = [
   {
     inputs: [
       { name: 'path', type: 'bytes' },
@@ -162,15 +158,14 @@ export const FUSIONX_QUOTER_V2_PATH_ABI = [
   },
 ] as const
 
-/** SwapRouter.exactInput — multi-hop, packed-bytes path (verified selector 0xc04b8d59). */
-export const FUSIONX_V3_ROUTER_EXACT_INPUT_ABI = [
+/** SwapRouter02.exactInput — multi-hop, packed-bytes path, NO `deadline` (selector 0xb858183f). */
+export const HSKSWAP_ROUTER_EXACT_INPUT_ABI = [
   {
     inputs: [
       {
         components: [
           { name: 'path', type: 'bytes' },
           { name: 'recipient', type: 'address' },
-          { name: 'deadline', type: 'uint256' },
           { name: 'amountIn', type: 'uint256' },
           { name: 'amountOutMinimum', type: 'uint256' },
         ],
@@ -187,13 +182,13 @@ export const FUSIONX_V3_ROUTER_EXACT_INPUT_ABI = [
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
-export type FusionXToken = {
+export type HSKSwapToken = {
   address: Address
   symbol: string
   decimals: number
 }
 
-export type FusionXQuote = {
+export type HSKSwapQuote = {
   amountOut: bigint
   /** The fee tier (in hundredths of a bip) that produced the best quote. */
   fee: number
@@ -203,13 +198,13 @@ export type FusionXQuote = {
 
 /**
  * Probes every candidate fee tier via the QuoterV2 and returns the tier with
- * the best output. Returns `null` if no FusionX V3 pool exists for the pair.
+ * the best output. Returns `null` if no HSKSwap pool exists for the pair.
  *
  * Works with both a server viem `PublicClient` and the wagmi browser client —
  * both expose `simulateContract`, which is required because the quoter is a
  * state-mutating simulation (it reverts to return its result).
  */
-export async function quoteFusionXBestTier(
+export async function quoteHSKSwapBestTier(
   publicClient: PublicClient,
   params: {
     tokenIn: Address
@@ -218,10 +213,10 @@ export async function quoteFusionXBestTier(
     feeTiers?: readonly number[]
     quoter?: Address
   },
-): Promise<FusionXQuote | null> {
+): Promise<HSKSwapQuote | null> {
   const { tokenIn, tokenOut, amountIn } = params
-  const feeTiers = params.feeTiers ?? FUSIONX_FEE_TIERS
-  const quoter = params.quoter ?? (FUSIONX_V3_QUOTER_V2 as Address)
+  const feeTiers = params.feeTiers ?? HSKSWAP_FEE_TIERS
+  const quoter = params.quoter ?? (HSKSWAP.quoterV2)
 
   if (amountIn <= 0n) return null
 
@@ -230,7 +225,7 @@ export async function quoteFusionXBestTier(
       try {
         const { result } = await publicClient.simulateContract({
           address: quoter,
-          abi: FUSIONX_QUOTER_V2_ABI,
+          abi: HSKSWAP_QUOTER_V2_ABI,
           functionName: 'quoteExactInputSingle',
           args: [{ tokenIn, tokenOut, amountIn, fee, sqrtPriceLimitX96: 0n }],
         })
@@ -243,7 +238,7 @@ export async function quoteFusionXBestTier(
     }),
   )
 
-  let best: FusionXQuote | null = null
+  let best: HSKSwapQuote | null = null
   for (const r of results) {
     if (r && r.amountOut > 0n && (!best || r.amountOut > best.amountOut)) {
       best = { amountOut: r.amountOut, fee: r.fee }
@@ -275,7 +270,7 @@ export function encodeV3Path(tokens: Address[], fees: number[]): Hex {
   return encodePacked(types, values)
 }
 
-export type FusionXMultiHopQuote = {
+export type HSKSwapMultiHopQuote = {
   amountOut: bigint
   /** Token addresses along the route, e.g. [tokenIn, hub, tokenOut]. */
   path: Address[]
@@ -287,13 +282,13 @@ export type FusionXMultiHopQuote = {
 
 /**
  * Finds the best two-hop route `tokenIn -> hub -> tokenOut` through any of the
- * given hub tokens (e.g. WMNT/USDC/USDT), probing each hop's best fee tier
+ * given hub tokens (e.g. USDT/WHSK), probing each hop's best fee tier
  * independently and then re-quoting the assembled path end-to-end via
  * `quoteExactInput` for an accurate combined-slippage estimate.
  *
  * Returns `null` if no two-hop route has any liquidity.
  */
-export async function quoteFusionXMultiHop(
+export async function quoteHSKSwapMultiHop(
   publicClient: PublicClient,
   params: {
     tokenIn: Address
@@ -303,9 +298,9 @@ export async function quoteFusionXMultiHop(
     quoter?: Address
     feeTiers?: readonly number[]
   },
-): Promise<FusionXMultiHopQuote | null> {
+): Promise<HSKSwapMultiHopQuote | null> {
   const { tokenIn, tokenOut, amountIn, hubTokens, feeTiers } = params
-  const quoter = params.quoter ?? (FUSIONX_V3_QUOTER_V2 as Address)
+  const quoter = params.quoter ?? (HSKSWAP.quoterV2)
   if (amountIn <= 0n) return null
 
   const hubs = hubTokens.filter(
@@ -314,10 +309,10 @@ export async function quoteFusionXMultiHop(
       hub.toLowerCase() !== tokenOut.toLowerCase(),
   )
 
-  let best: FusionXMultiHopQuote | null = null
+  let best: HSKSwapMultiHopQuote | null = null
 
   for (const hub of hubs) {
-    const leg1 = await quoteFusionXBestTier(publicClient, {
+    const leg1 = await quoteHSKSwapBestTier(publicClient, {
       tokenIn,
       tokenOut: hub,
       amountIn,
@@ -326,7 +321,7 @@ export async function quoteFusionXMultiHop(
     })
     if (!leg1 || leg1.amountOut <= 0n) continue
 
-    const leg2 = await quoteFusionXBestTier(publicClient, {
+    const leg2 = await quoteHSKSwapBestTier(publicClient, {
       tokenIn: hub,
       tokenOut,
       amountIn: leg1.amountOut,
@@ -342,7 +337,7 @@ export async function quoteFusionXMultiHop(
     try {
       const { result } = await publicClient.simulateContract({
         address: quoter,
-        abi: FUSIONX_QUOTER_V2_PATH_ABI,
+        abi: HSKSWAP_QUOTER_V2_PATH_ABI,
         functionName: 'quoteExactInput',
         args: [encodedPath, amountIn],
       })
@@ -360,7 +355,7 @@ export async function quoteFusionXMultiHop(
 
 // ── Server-side execution (agent burner wallet) ──────────────────────────────
 
-export type FusionXSwapResult = {
+export type HSKSwapSwapResult = {
   txHash: `0x${string}`
   amountIn: bigint
   amountOut: bigint
@@ -371,23 +366,22 @@ export type FusionXSwapResult = {
 }
 
 /**
- * Executes a single-hop FusionX V3 swap from a server-managed agent wallet.
+ * Executes a single-hop HSKSwap swap from a server-managed agent wallet.
  *
  * Resolves the best fee tier via the QuoterV2, derives `amountOutMinimum` from
  * the live quote + slippage (so it works for any decimal/price ratio — unlike a
  * naive 1:1 minimum), approves the router if needed, then calls
  * `exactInputSingle`. Throws on insufficient balance or no available pool.
  *
- * Does not wait for the swap receipt — returns the submitted tx hash, matching
- * the previous Jaine adapter's behaviour. (It does wait for the approval
- * receipt, since the swap depends on it.)
+ * Does not wait for the swap receipt — returns the submitted tx hash. (It does
+ * wait for the approval receipt, since the swap depends on it.)
  */
-export async function executeFusionXAgentSwap(params: {
+export async function executeHSKSwapAgentSwap(params: {
   account: PrivateKeyAccount
   chain: Chain
   rpcUrl: string
-  tokenIn: FusionXToken
-  tokenOut: FusionXToken
+  tokenIn: HSKSwapToken
+  tokenOut: HSKSwapToken
   /** Amount to sell, already denominated in `tokenIn` base units. */
   amountIn: bigint
   slippageBps?: number
@@ -395,7 +389,7 @@ export async function executeFusionXAgentSwap(params: {
   fee?: number
   swapRouter?: Address
   quoter?: Address
-}): Promise<FusionXSwapResult> {
+}): Promise<HSKSwapSwapResult> {
   const {
     account,
     chain,
@@ -405,19 +399,19 @@ export async function executeFusionXAgentSwap(params: {
     amountIn,
     slippageBps = 200,
     fee: forcedFee,
-    swapRouter = FUSIONX_V3_SWAP_ROUTER as Address,
-    quoter = FUSIONX_V3_QUOTER_V2 as Address,
+    swapRouter = HSKSWAP.swapRouter02,
+    quoter = HSKSWAP.quoterV2,
   } = params
 
   if (amountIn <= 0n) {
-    throw new Error('FusionX swap amount must be greater than 0.')
+    throw new Error('HSKSwap swap amount must be greater than 0.')
   }
 
   const publicClient = createPublicClient({ chain, transport: http(rpcUrl) })
   const walletClient = createWalletClient({ account, chain, transport: http(rpcUrl) })
 
   // Resolve the best fee tier + expected output.
-  const quote = await quoteFusionXBestTier(publicClient, {
+  const quote = await quoteHSKSwapBestTier(publicClient, {
     tokenIn: tokenIn.address,
     tokenOut: tokenOut.address,
     amountIn,
@@ -426,7 +420,7 @@ export async function executeFusionXAgentSwap(params: {
   })
   if (!quote) {
     throw new Error(
-      `No FusionX V3 pool with liquidity for ${tokenIn.symbol}/${tokenOut.symbol}.`,
+      `No HSKSwap pool with liquidity for ${tokenIn.symbol}/${tokenOut.symbol}.`,
     )
   }
 
@@ -436,7 +430,7 @@ export async function executeFusionXAgentSwap(params: {
   // Balance check.
   const balance = (await publicClient.readContract({
     address: tokenIn.address,
-    abi: FUSIONX_ERC20_ABI,
+    abi: HSKSWAP_ERC20_ABI,
     functionName: 'balanceOf',
     args: [account.address],
   })) as bigint
@@ -447,14 +441,14 @@ export async function executeFusionXAgentSwap(params: {
   // Approve the router if the current allowance is short.
   const allowance = (await publicClient.readContract({
     address: tokenIn.address,
-    abi: FUSIONX_ERC20_ABI,
+    abi: HSKSWAP_ERC20_ABI,
     functionName: 'allowance',
     args: [account.address, swapRouter],
   })) as bigint
   if (allowance < amountIn) {
     const approveTx = await walletClient.writeContract({
       address: tokenIn.address,
-      abi: FUSIONX_ERC20_ABI,
+      abi: HSKSWAP_ERC20_ABI,
       functionName: 'approve',
       args: [swapRouter, amountIn],
     })
@@ -463,7 +457,7 @@ export async function executeFusionXAgentSwap(params: {
 
   const txHash = await walletClient.writeContract({
     address: swapRouter,
-    abi: FUSIONX_V3_ROUTER_ABI,
+    abi: HSKSWAP_ROUTER_ABI,
     functionName: 'exactInputSingle',
     args: [
       {
@@ -471,7 +465,6 @@ export async function executeFusionXAgentSwap(params: {
         tokenOut: tokenOut.address,
         fee: quote.fee,
         recipient: account.address,
-        deadline: BigInt(Math.floor(Date.now() / 1000) + 20 * 60),
         amountIn,
         amountOutMinimum,
         sqrtPriceLimitX96: 0n,

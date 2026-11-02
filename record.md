@@ -102,3 +102,8 @@ changes: integrated market-data poller & REST caching server into realtime-servi
 user: ansu555
 branch: main
 changes: compiled, tested (39/39 passing), and deployed custom OmeSwap AMM MultiTokenLiquidityPools and MultiHopSwapRouter contracts to local Hardhat node; seeded mock OmE/USDO pool with liquidity; updated Mantle Sepolia network configurations in Next.js registry with deployed contract addresses and mock token info
+
+[2026-11-02 18:27]
+user: Eshan276
+branch: main
+changes: new repo omeswap-hsk — ported Mantle → HashKey Chain (177/133); HSKSwap SwapRouter02/QuoterV2 adapter, on-chain pool pricing, realtime-service + hardhat + docs updated

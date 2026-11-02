@@ -1,14 +1,14 @@
-# OmeSwap on Mantle
+# OmeSwap on HashKey Chain
 
-A decentralized exchange and agent-driven trading app built for the Mantle network.
+An AI-agent trading app for HSKSwap on HashKey Chain — autonomous market monitoring, signal detection and order execution with risk controls, plus a natural-language interface for positions, P&L and strategy settings.
 
-![Mantle](https://img.shields.io/badge/Chain-Mantle-00bcd4) ![Next.js](https://img.shields.io/badge/Next.js-15-black) ![React](https://img.shields.io/badge/React-19-blue)
+![HashKey Chain](https://img.shields.io/badge/Chain-HashKey-4f46e5) ![Next.js](https://img.shields.io/badge/Next.js-15-black) ![React](https://img.shields.io/badge/React-19-blue)
 
 ## Features
 
-- Multi-DEX swap aggregation (FusionX V3, Agni Finance, Merchant Moe) + liquidity primitives
-- Mantle-native chain registry and wallet switching
-- Mantle Mainnet + Sepolia Testnet support
+- Best-route swaps on HSKSwap (direct + two-hop via USDT/WHSK) + liquidity primitives
+- HashKey-native chain registry and wallet switching
+- HashKey Chain Mainnet (177) + Testnet (133) support
 - Agent wallet + ATS research/execution flows
 - Integration points for 0G Storage, Compute, and DA (external AI/data infra)
 - Next.js + wagmi/viem frontend with modern UI
@@ -37,9 +37,10 @@ NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id
 Optional network overrides (defaults come from chain registry):
 
 ```bash
-NEXT_PUBLIC_MANTLE_NETWORK=mainnet            # or testnet
-NEXT_PUBLIC_MANTLE_RPC=https://rpc.mantle.xyz
-NEXT_PUBLIC_MANTLE_WSS=wss://wss.mantle.xyz
+NEXT_PUBLIC_HASHKEY_NETWORK=mainnet            # default: testnet
+NEXT_PUBLIC_HASHKEY_RPC=https://mainnet.hsk.xyz
+NEXT_PUBLIC_HASHKEY_WSS=wss://mainnet.hsk.xyz/ws
+NEXT_PUBLIC_HASHKEY_RPC_TESTNET=https://testnet.hsk.xyz
 ```
 
 Realtime Service overrides (points the frontend to the realtime service cache server):
@@ -71,49 +72,51 @@ Open `http://localhost:3000`.
 
 - Node.js 18+
 - MetaMask or compatible EVM wallet
-- MNT balance for gas on your selected Mantle network
+- HSK balance for gas on your selected HashKey Chain network
 
 ## Tech Stack
 
 - Frontend: Next.js 15, React 19, Tailwind, shadcn/ui
 - Web3: wagmi v2, viem v2, RainbowKit
-- Contracts: Solidity + Hardhat (under `0g-contract/`)
+- Contracts: Solidity + Hardhat (under `contract/`)
 - Agents: ATS orchestration with optional AXL peer transport
 
-## Mantle Network Configuration
+## HashKey Chain Network Configuration
 
-### Mantle Mainnet (default)
+### HashKey Chain Testnet (default)
 
-- Chain ID: `5000`
-- RPC: `https://rpc.mantle.xyz`
-- WSS: `wss://wss.mantle.xyz`
-- Explorer: `https://explorer.mantle.xyz`
+- Chain ID: `133`
+- RPC: `https://testnet.hsk.xyz`
+- Explorer: `https://testnet-explorer.hsk.xyz`
 
-### Mantle Sepolia Testnet
+### HashKey Chain Mainnet
 
-- Chain ID: `5003`
-- RPC: `https://rpc.sepolia.mantle.xyz`
-- WSS: `wss://wss.sepolia.mantle.xyz`
-- Explorer: `https://explorer.sepolia.mantle.xyz`
+- Chain ID: `177`
+- RPC: `https://mainnet.hsk.xyz`
+- WSS: `wss://mainnet.hsk.xyz/ws`
+- Explorer: `https://hashkey.blockscout.com`
 
-Switch between them with:
+Switch the default trading chain with:
 
 ```bash
-NEXT_PUBLIC_MANTLE_NETWORK=mainnet  # or testnet
+NEXT_PUBLIC_HASHKEY_NETWORK=mainnet  # anything else → testnet
 ```
 
-## Core Addresses (Mantle Mainnet)
+The terminal's HSKSwap markets (WHSK/USDT, WETH/USDT, WBTC/USDT on mainnet; WHSK/USDT on testnet) trade on their own chain regardless of this setting.
 
-From `lib/chain-registry/chains/mantle.ts`:
+## Core Addresses (HashKey Chain Mainnet)
 
-- WMNT (Wrapped Mantle): `0x78c1b0c915c4faa5fffa6cabf0219da63d7f4cb8`
-- USDC: `0x09bc4e0d864854c6afb6eb9a9cdf58ac190d0df9`
-- USDT: `0x201eba5cc46d216ce6dc03f6a759e8e766e956ae`
-- FusionX V3 Router: `0x5989FB161568b9F133eDf5Cf6787f5597762797F`
-- Agni Finance Router: `0x319B69888b0d11cEC22caA5034e25FfFBDc88421`
-- Merchant Moe LB Router: `0x013e138EF6008ae5FDFDE29700e3f2Bc61d21E3a`
+From `lib/chain-registry/chains/hashkey.ts` (HSKSwap developer docs, verified on-chain):
 
-> OmeSwap's own AMM (`omeswapPools` / `omeswapRouter`) is deployed to Mantle Sepolia from `0g-contract/`; mainnet AMM addresses are TBD. See `lib/chain-registry/chains/mantle.ts`.
+| Contract | Mainnet (177) | Testnet (133) |
+|---|---|---|
+| HSKSwap UniswapV3Factory | `0x972cA9D1662F5e029cD18327D29026532E84c742` | `0x2dC2c21D1049F786C535bF9d45F999dB5474f3A0` |
+| HSKSwap SwapRouter02 | `0x2c16f75b95Cf1390c328aB70e2CEE7f4b80bD8F3` | `0xa6914E66690c6794244B5f66a09eAEbf66254237` |
+| HSKSwap QuoterV2 | `0x603f70466fDdbE3F238220B9a74FFF419a2BbFDD` | `0x73820d9eE5Bf1BfcD429580320FC7A374E8fa1cC` |
+| WHSK | `0xB210D2120d57b758EE163cFfb43e73728c471Cf1` | `0xCA8aAceEC5Db1e91B9Ed3a344bA026c4a2B3ebF6` |
+| USDT | `0xF1B50eD67A9e2CC94Ad3c477779E2d4cBfFf9029` (6 dec) | `0x98B6173A8B7DFc52ce8bc88f1184a918A1CCaa4F` (18 dec) |
+
+> OmeSwap's own AMM (`omeswapPools` / `omeswapRouter`, source in `contract/`) is not yet deployed on HashKey Chain. The app swaps through HSKSwap and does not need it.
 
 ## Scripts
 
@@ -123,13 +126,13 @@ npm run build
 npm run start
 npm run lint
 
-# Smart contracts (self-contained hardhat project — run inside 0g-contract/)
-cd 0g-contract && npm install
+# Smart contracts (self-contained hardhat project — run inside contract/)
+cd contract && npm install
 npx hardhat compile
 npx hardhat test
-npx hardhat run scripts/deployTokens.js --network mantleSepolia
-npx hardhat run scripts/deploy.js       --network mantleSepolia
-npx hardhat run scripts/addLiquidity.js --network mantleSepolia
+npx hardhat run scripts/deployTokens.js --network hashkeyTestnet
+npx hardhat run scripts/deploy.js       --network hashkeyTestnet
+npx hardhat run scripts/addLiquidity.js --network hashkeyTestnet
 
 npm run axl:agent
 npm run axl:demo
@@ -159,7 +162,7 @@ omeswap-templet/
 ├── app/
 ├── components/
 ├── contracts/
-├── 0g-contract/
+├── contract/
 ├── hooks/
 ├── lib/
 ├── scripts/
@@ -183,9 +186,9 @@ The `realtime-service` runs as a persistent Node process and is fully Dockerized
    - Choose a plan (e.g. Free or Starter).
    - Add the following environment variables:
      - `PORT`: `8080`
-     - `MANTLE_NETWORK`: `mainnet` (or `testnet`)
-     - `MANTLE_RPC`: (Mantle RPC URL)
-     - `MANTLE_WSS`: (Mantle WebSocket URL)
+     - `HASHKEY_NETWORK`: `mainnet` (or `testnet` — also set `HASHKEY_WSS`, no public testnet WebSocket is known)
+     - `HASHKEY_RPC`: `https://mainnet.hsk.xyz`
+     - `HASHKEY_WSS`: `wss://mainnet.hsk.xyz/ws`
    - Click **Deploy Web Service**.
 
 Once deployed, copy your Render web service URL (e.g., `https://omeswap-realtime.onrender.com`) and configure the Next.js app to use it:
@@ -204,6 +207,7 @@ This project includes on-chain execution paths. Before production usage, perform
 ## Support
 
 - Issues: GitHub Issues
-- Mantle Explorer: https://explorer.mantle.xyz
+- HashKey Chain Explorer: https://hashkey.blockscout.com
+- HSKSwap: https://app.hskswap.com
 
-Built for the Mantle ecosystem
+Built for the HashKey Chain "AI Agent Trading" track

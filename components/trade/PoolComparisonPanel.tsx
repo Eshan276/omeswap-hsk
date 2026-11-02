@@ -32,9 +32,9 @@ function shortAddress(value: string) {
   return `${value.slice(0, 6)}...${value.slice(-4)}`;
 }
 
-export function PoolComparisonPanel({ token0Symbol = "WMNT", token1Symbol = "USDC" }: PoolComparisonPanelProps) {
-  const [activeTab, setActiveTab] = useState<"fusionx" | "omega">("fusionx");
-  const [fusionxMarket, setFusionxMarket] = useState<DexMarket | null>(null);
+export function PoolComparisonPanel({ token0Symbol = "WHSK", token1Symbol = "USDT" }: PoolComparisonPanelProps) {
+  const [activeTab, setActiveTab] = useState<"hskswap" | "omega">("hskswap");
+  const [hskswapMarket, setHskswapMarket] = useState<DexMarket | null>(null);
   const [isLoadingMarket, setIsLoadingMarket] = useState(true);
   const [marketError, setMarketError] = useState<string | null>(null);
 
@@ -49,7 +49,7 @@ export function PoolComparisonPanel({ token0Symbol = "WMNT", token1Symbol = "USD
   const poolsAddress = (chainCfg.omeswapPools ?? CONTRACT_ADDRESSES.POOLS) as Address;
   const isOmeSwapConfigured = poolsAddress.toLowerCase() !== ZERO_ADDRESS;
 
-  const omegaToken0Cfg = TOKENS[token0Symbol] ?? TOKENS.WMNT;
+  const omegaToken0Cfg = TOKENS[token0Symbol] ?? TOKENS.WHSK;
   const omegaToken1Cfg = TOKENS[token1Symbol] ?? TOKENS.USDC;
 
   const [token0Address, token1Address] = useMemo(() => {
@@ -98,16 +98,16 @@ export function PoolComparisonPanel({ token0Symbol = "WMNT", token1Symbol = "USD
           `/api/dex/markets?id=${encodeURIComponent(DEFAULT_DEX_MARKET_ID)}`,
           { signal: aborter.signal },
         );
-        if (!response.ok) throw new Error("Unable to load FusionX market");
+        if (!response.ok) throw new Error("Unable to load HSKSwap market");
 
         const payload = (await response.json()) as MarketResponse;
         if (!disposed) {
-          setFusionxMarket(payload.market ?? null);
+          setHskswapMarket(payload.market ?? null);
           setMarketError(null);
         }
       } catch {
         if (!disposed && !aborter.signal.aborted) {
-          setMarketError("FusionX market feed is temporarily unavailable.");
+          setMarketError("HSKSwap market feed is temporarily unavailable.");
         }
       } finally {
         if (!disposed) setIsLoadingMarket(false);
@@ -128,9 +128,9 @@ export function PoolComparisonPanel({ token0Symbol = "WMNT", token1Symbol = "USD
   const reserve0 = Number.parseFloat(formatUnits(poolTuple?.[2] ?? 0n, token0.decimals));
   const reserve1 = Number.parseFloat(formatUnits(poolTuple?.[3] ?? 0n, token1.decimals));
   const totalSupply = Number.parseFloat(formatUnits(poolTuple?.[4] ?? 0n, 18));
-  const fusionxPoolExplorer =
-    fusionxMarket && fusionxMarket.chainId
-      ? getExplorerLink(fusionxMarket.chainId, "address", fusionxMarket.poolAddress)
+  const hskswapPoolExplorer =
+    hskswapMarket && hskswapMarket.chainId
+      ? getExplorerLink(hskswapMarket.chainId, "address", hskswapMarket.poolAddress)
       : null;
 
   return (
@@ -140,23 +140,23 @@ export function PoolComparisonPanel({ token0Symbol = "WMNT", token1Symbol = "USD
           <h3 className="text-lg font-semibold">Pool Details</h3>
         </div>
         <span className="text-[11px] px-2 py-1 rounded-full border border-primary/30 text-primary">
-          Mantle
+          HashKey Chain
         </span>
       </div>
 
       {/* Tabs */}
       <div className="flex items-center gap-1 bg-muted/50 rounded-xl p-1">
         <button
-          onClick={() => setActiveTab("fusionx")}
+          onClick={() => setActiveTab("hskswap")}
           className={cn(
             "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-sm font-medium transition-colors",
-            activeTab === "fusionx"
+            activeTab === "hskswap"
               ? "bg-background text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"
           )}
         >
           <Activity className="w-3.5 h-3.5" />
-          FusionX
+          HSKSwap
         </button>
         <button
           onClick={() => setActiveTab("omega")}
@@ -172,66 +172,66 @@ export function PoolComparisonPanel({ token0Symbol = "WMNT", token1Symbol = "USD
         </button>
       </div>
 
-      {/* FusionX Tab */}
-      {activeTab === "fusionx" && (
+      {/* HSKSwap Tab */}
+      {activeTab === "hskswap" && (
         <div className="rounded-xl border border-border/70 bg-muted/25 p-4 space-y-3">
-          {isLoadingMarket && !fusionxMarket ? (
-            <p className="text-sm text-muted-foreground">Loading FusionX pool data...</p>
-          ) : fusionxMarket ? (
+          {isLoadingMarket && !hskswapMarket ? (
+            <p className="text-sm text-muted-foreground">Loading HSKSwap pool data...</p>
+          ) : hskswapMarket ? (
             <>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Pair</span>
-                <span className="font-medium">{fusionxMarket.pairLabel}</span>
+                <span className="font-medium">{hskswapMarket.pairLabel}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Price</span>
-                <span className="font-medium">{formatUsd(fusionxMarket.priceUsd)}</span>
+                <span className="font-medium">{formatUsd(hskswapMarket.priceUsd)}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Liquidity</span>
-                <span className="font-medium">{formatUsd(fusionxMarket.liquidityUsd)}</span>
+                <span className="font-medium">{formatUsd(hskswapMarket.liquidityUsd)}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">24h Volume</span>
-                <span className="font-medium">{formatUsd(fusionxMarket.volume24hUsd)}</span>
+                <span className="font-medium">{formatUsd(hskswapMarket.volume24hUsd)}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">24h Trades</span>
-                <span className="font-medium">{fusionxMarket.transactions24h.toLocaleString()}</span>
+                <span className="font-medium">{hskswapMarket.transactions24h.toLocaleString()}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Execution Venue</span>
-                <span className="font-medium">{fusionxMarket.executionVenue}</span>
+                <span className="font-medium">{hskswapMarket.executionVenue}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Pool</span>
-                {fusionxPoolExplorer ? (
+                {hskswapPoolExplorer ? (
                   <a
-                    href={fusionxPoolExplorer}
+                    href={hskswapPoolExplorer}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 text-primary hover:underline"
                   >
-                    {shortAddress(fusionxMarket.poolAddress)}
+                    {shortAddress(hskswapMarket.poolAddress)}
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 ) : (
-                  <span className="font-mono">{shortAddress(fusionxMarket.poolAddress)}</span>
+                  <span className="font-mono">{shortAddress(hskswapMarket.poolAddress)}</span>
                 )}
               </div>
               <a
-                href="https://fusionx.finance/pools"
+                href="https://app.hskswap.com/positions"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-1 flex items-center justify-center gap-1.5 w-full py-2 rounded-lg border border-primary/30 text-xs text-primary hover:bg-primary/10 transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
-                Provide LP on FusionX
+                Provide LP on HSKSwap
                 <ExternalLink className="w-3 h-3" />
               </a>
             </>
           ) : (
-            <p className="text-sm text-muted-foreground">{marketError ?? "No FusionX pool data yet."}</p>
+            <p className="text-sm text-muted-foreground">{marketError ?? "No HSKSwap pool data yet."}</p>
           )}
         </div>
       )}

@@ -5,7 +5,7 @@
  * external infrastructure REGARDLESS of which chain the DEX trades on. They are
  * intentionally independent of the chain registry / default trading chain, so
  * the agent memory/inference/DA layer keeps working after the trading chain
- * moved to Mantle.
+ * moved to HashKey Chain.
  *
  * Select the 0G service network with NEXT_PUBLIC_0G_NETWORK=mainnet|testnet.
  */

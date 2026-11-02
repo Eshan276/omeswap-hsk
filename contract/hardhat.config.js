@@ -10,19 +10,22 @@ module.exports = {
     settings: {
       optimizer: { enabled: true, runs: 200 },
       viaIR: true,
+      // Conservative target so bytecode runs on any EVM L2 regardless of
+      // whether it has adopted Shanghai's PUSH0.
+      evmVersion: "paris",
     },
   },
   networks: {
-    mantleSepolia: {
-      url: process.env.MANTLE_RPC || "https://rpc.sepolia.mantle.xyz",
+    hashkeyTestnet: {
+      url: process.env.HASHKEY_RPC_TESTNET || "https://testnet.hsk.xyz",
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
-      chainId: 5003,
+      chainId: 133,
       gasPrice: "auto",
     },
-    mantle: {
-      url: process.env.MANTLE_RPC || "https://rpc.mantle.xyz",
+    hashkey: {
+      url: process.env.HASHKEY_RPC || "https://mainnet.hsk.xyz",
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
-      chainId: 5000,
+      chainId: 177,
       gasPrice: "auto",
     },
   },

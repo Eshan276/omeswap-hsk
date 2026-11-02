@@ -23,7 +23,7 @@ import type { RunEvent } from '@/lib/ats/types'
 export interface ToolContext {
   /** Caller's wallet — resolves their stored OpenRouter key + funds ATS reads. */
   userWallet?: string
-  /** Chain the research is scoped to (defaults to Mantle at the call site). */
+  /** Chain the research is scoped to (defaults to HashKey Chain at the call site). */
   chainId: number
   /** Run id for event attribution. */
   run_id: string

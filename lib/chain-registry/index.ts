@@ -1,8 +1,8 @@
 /**
  * Chain Registry — central lookup for all supported chain configs.
  *
- * Default chain: Mantle (selected in lib/chain-registry/chains/mantle.ts)
- * Mantle is an EVM-compatible L2 (chainId 5000); FusionX V3 is its primary DEX.
+ * Default chain: HashKey Chain (lib/chain-registry/chains/hashkey.ts) — testnet
+ * (133) unless NEXT_PUBLIC_HASHKEY_NETWORK=mainnet (177). HSKSwap is its DEX.
  *
  * Note: 0G's Storage / Compute / DA remain in use as external agent
  * infrastructure via lib/zerog — independent of this trading-chain registry.
@@ -15,16 +15,16 @@
  */
 
 import type { ChainConfig, DexRouter, TokenInfo } from './types'
-import { mantleMainnetConfig, mantleSepoliaConfig } from './chains/mantle'
+import { HASHKEY_CHAIN_ID, hashkeyMainnetConfig, hashkeyTestnetConfig } from './chains/hashkey'
 
 // ── Registry ─────────────────────────────────────────────────────────────────
 
 const REGISTRY: Record<number, ChainConfig> = {
-  [mantleMainnetConfig.chain.id]: mantleMainnetConfig,
-  [mantleSepoliaConfig.chain.id]: mantleSepoliaConfig,
+  [hashkeyMainnetConfig.chain.id]: hashkeyMainnetConfig,
+  [hashkeyTestnetConfig.chain.id]: hashkeyTestnetConfig,
 }
 
-export const DEFAULT_CHAIN_ID: number = mantleSepoliaConfig.chain.id
+export const DEFAULT_CHAIN_ID: number = HASHKEY_CHAIN_ID
 
 // ── Lookup helpers ────────────────────────────────────────────────────────────
 
@@ -48,7 +48,7 @@ export function getSupportedChains(): ChainConfig[] {
   return Object.values(REGISTRY)
 }
 
-/** Returns the default chain ID (Mantle). */
+/** Returns the default chain ID (HashKey Chain). */
 export function getDefaultChainId(): number {
   return DEFAULT_CHAIN_ID
 }

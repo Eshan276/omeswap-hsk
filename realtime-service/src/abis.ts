@@ -5,12 +5,12 @@
 
 import { parseAbi } from "viem";
 
-/** Uniswap V3 / FusionX V3 factory. */
+/** Uniswap V3 / HSKSwap factory. */
 export const V3_FACTORY_ABI = parseAbi([
   "function getPool(address tokenA, address tokenB, uint24 fee) view returns (address pool)",
 ]);
 
-/** Uniswap V3 / FusionX V3 pool — reads + the Swap event we subscribe to. */
+/** Uniswap V3 / HSKSwap pool — reads + the Swap event we subscribe to. */
 export const V3_POOL_ABI = parseAbi([
   "function token0() view returns (address)",
   "function token1() view returns (address)",

@@ -2,7 +2,7 @@
  * Frontend client for the Omeswap realtime-service (see /realtime-service).
  *
  * A single shared WebSocket connection to the service receives live `price`,
- * `pool`, and `trade` deltas (block-time on Mantle). Consumers subscribe via
+ * `pool`, and `trade` deltas (block-time on HashKey Chain). Consumers subscribe via
  * `onMessage`; React hooks layer on top (see hooks/use-realtime-feed.tsx).
  *
  * This mirrors the service wire protocol in realtime-service/src/messages.ts —

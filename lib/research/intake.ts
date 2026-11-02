@@ -28,7 +28,7 @@ import type { QueryType, ResearchRequest, RiskTolerance } from '@/lib/research/t
 // eligible to become a single-asset `primaryTicker`.
 
 const TOKEN_ALIASES: Array<{ canonical: string; terms: string[] }> = [
-  { canonical: 'WMNT', terms: ['WMNT', 'MNT', 'MANTLE'] },
+  { canonical: 'WHSK', terms: ['WHSK', 'HSK', 'HASHKEY'] },
   { canonical: 'BTC', terms: ['BTC', 'BITCOIN'] },
   { canonical: 'ETH', terms: ['ETH', 'ETHEREUM'] },
   { canonical: 'SOL', terms: ['SOL', 'SOLANA'] },
@@ -146,11 +146,11 @@ function buildUserPrompt(query: string): string {
     '- conceptual: open-ended, educational, or "how does X work" questions',
     '',
     `Known tickers the system can analyse deeply: ${knownList}.`,
-    'For "tokens", return canonical UPPERCASE symbols (e.g. Bitcoin -> BTC, Mantle -> WMNT).',
+    'For "tokens", return canonical UPPERCASE symbols (e.g. Bitcoin -> BTC, HashKey -> WHSK).',
     'If the user states a budget, set amountUsd to the number of US dollars (USDC/USDT/USD count as USD).',
     'Set horizon to any stated time frame ("3 months", "long term") or null.',
     'Set riskTolerance to "low" | "medium" | "high" only if stated or strongly implied, else null.',
-    'Set chain to the chain named, else null (the platform trades on Mantle by default).',
+    'Set chain to the chain named, else null (the platform trades on HashKey Chain by default).',
     'assumptions: short statements of any gaps you are filling to proceed (e.g. "Assuming a medium risk tolerance").',
     'clarifyingQuestions: at most 2, only for genuinely decision-critical missing info; otherwise [].',
     'needsClarification: true only if you truly cannot give a useful answer without asking.',

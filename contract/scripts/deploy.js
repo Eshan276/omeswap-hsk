@@ -26,12 +26,12 @@ async function main() {
 
   console.log("\nDeployment complete!");
   console.log("=".repeat(60));
-  console.log("COPY THESE INTO the testnet branch of lib/chain-registry/chains/mantle.ts:");
+  console.log("COPY THESE INTO the testnet branch of lib/chain-registry/chains/hashkey.ts:");
   console.log("=".repeat(60));
   console.log(`  omeswapPools:  "${poolsAddress}"`);
   console.log(`  omeswapRouter: "${routerAddress}"`);
   console.log("=".repeat(60));
-  console.log(`\nNext step: POOLS_ADDRESS=${poolsAddress} npx hardhat run scripts/deployTokens.js --network mantleSepolia`);
+  console.log(`\nNext step: POOLS_ADDRESS=${poolsAddress} npx hardhat run scripts/deployTokens.js --network hashkeyTestnet`);
 }
 
 main().catch((err) => {

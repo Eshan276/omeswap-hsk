@@ -1,6 +1,6 @@
 /**
  * Pool discovery. Scoped to the configured token set ({tokens × tokens}) rather
- * than every pool on Mantle, which keeps in-memory state bounded. For each
+ * than every pool on HashKey Chain, which keeps in-memory state bounded. For each
  * unordered pair we probe every V3 fee tier; existing pools are seeded into
  * price-state with their current sqrtPrice/liquidity.
  */

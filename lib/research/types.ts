@@ -16,10 +16,10 @@
  * else is handled by the v2 research brain (a stub in P0).
  */
 export type QueryType =
-  | 'asset_deep_dive' // "is WMNT worth buying right now?"
+  | 'asset_deep_dive' // "is WHSK worth buying right now?"
   | 'allocation'      // "I have 50 USDC, where should I invest?"
   | 'market_overview' // "what's happening in the market?"
-  | 'comparison'      // "compare WMNT vs ETH for a 3-month hold"
+  | 'comparison'      // "compare WHSK vs ETH for a 3-month hold"
   | 'defi_yield'      // "best place to park stablecoins for yield?"
   | 'conceptual'      // open-ended / educational
 
@@ -44,7 +44,7 @@ export interface ResearchRequest {
   horizon: string | null
   /** Risk tolerance when stated or confidently inferable. */
   riskTolerance: RiskTolerance | null
-  /** Chain the user cares about (defaults to Mantle when unstated). */
+  /** Chain the user cares about (defaults to HashKey Chain when unstated). */
   chain: string | null
   /**
    * Explicit assumptions intake made in order to proceed without blocking on a
@@ -297,7 +297,7 @@ export interface DomainFinding {
 
 /** One line of an allocation recommendation (investment-style queries). */
 export interface AllocationItem {
-  /** Asset symbol or label (e.g. 'WMNT', 'USDC (hold)'). */
+  /** Asset symbol or label (e.g. 'WHSK', 'USDC (hold)'). */
   asset: string
   /** Percent of the budget to deploy (0–100). */
   weightPct: number

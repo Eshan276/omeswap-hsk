@@ -236,7 +236,7 @@ export async function crossVerify(
             '',
             'For each material narrative claim, output a verdict grounded ONLY in the evidence above.',
             'Return JSON: {"verifiedClaims": [{"claim": string, "status": "corroborated"|"contradicted"|"unverified", "support": string[], "reasoning": string}], "summary": string}',
-            'support = short source/tier labels that bear on the verdict (e.g. "onchain/Mantle RPC").',
+            'support = short source/tier labels that bear on the verdict (e.g. "onchain/HashKey Chain RPC").',
           ].join('\n'),
         },
       ],

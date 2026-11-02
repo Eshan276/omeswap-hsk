@@ -3,7 +3,7 @@
  * topic across all known pool addresses, decodes each event, updates in-memory
  * state, and emits a SwapUpdate. This is the core that makes data real-time:
  * a swap lands in a block → we're pushed the log → state updates within ~block
- * time (~1-2s on Mantle).
+ * time (~1-2s on HashKey Chain).
  */
 
 import { EventEmitter } from "node:events";

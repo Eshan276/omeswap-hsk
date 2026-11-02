@@ -119,10 +119,10 @@ export function Chart({ marketId }: { marketId: string }) {
     VOL: true,
   });
   const [stats, setStats] = useState<BtcStats>({
-    symbol: "WMNT",
-    pairLabel: "WMNT/USDC",
-    networkName: "Mantle",
-    dex: "FusionX V3",
+    symbol: "WHSK",
+    pairLabel: "WHSK/USDT",
+    networkName: "HashKey Chain",
+    dex: "HSKSwap",
     mark: 0,
     index: 0,
     changeAmount: 0,
@@ -138,7 +138,7 @@ export function Chart({ marketId }: { marketId: string }) {
     try {
       return getChainConfig(getDefaultChainId()).explorerUrl;
     } catch {
-      return "https://explorer.mantle.xyz";
+      return "https://hashkey.blockscout.com";
     }
   }, []);
   const [utcTime, setUtcTime] = useState("");
@@ -606,7 +606,7 @@ export function Chart({ marketId }: { marketId: string }) {
           <div className="absolute inset-0 bg-background/80 backdrop-blur-md flex flex-col items-center justify-center gap-3 z-10">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             <span className="text-sm font-medium text-foreground">Loading chart data...</span>
-            <span className="text-xs text-muted-foreground">Fetching live token details from Mantle</span>
+            <span className="text-xs text-muted-foreground">Fetching live token details from HashKey Chain</span>
           </div>
         )}
       </div>

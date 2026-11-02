@@ -25,7 +25,7 @@ const ERC20_TRANSFER_ABI = [
   },
 ] as const
 
-// USDC contract on Mantle — update via chain registry once deployed
+// USDC contract on HashKey Chain — update via chain registry once deployed
 const USDC_ADDRESS = "0x0000000000000000000000000000000000000001" as `0x${string}`
 const USDC_DECIMALS = 6
 

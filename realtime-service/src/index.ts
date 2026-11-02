@@ -1,16 +1,16 @@
 /**
  * Omeswap realtime-service entrypoint.
  *
- * Milestone 1 (current): boot → discover FusionX V3 pools for the configured
+ * Milestone 1 (current): boot → discover HSKSwap pools for the configured
  * token set → seed in-memory state from slot0 → subscribe to Swap events →
  * log every live price update to the console. This validates the end-to-end
- * real-time pipeline against Mantle mainnet before any frontend wiring.
+ * real-time pipeline against HashKey Chain mainnet before any frontend wiring.
  *
  * Later milestones add the price engine, own WS broadcast server, and REST
  * routing on top of the same state + subscriber.
  */
 
-import { PORT, MANTLE_CHAIN_ID, MANTLE_NETWORK, MANTLE_WSS } from "./config.js";
+import { PORT, HASHKEY_CHAIN_ID, HASHKEY_NETWORK, HASHKEY_WSS } from "./config.js";
 import { loadPools } from "./pool-registry.js";
 import { allPools } from "./price-state.js";
 import { startSubscriber, stopSubscriber, swapEvents, type SwapUpdate } from "./subscriber.js";
@@ -26,7 +26,7 @@ function fmtPrice(p: number): string {
 
 async function main(): Promise<void> {
   console.log(
-    `[boot] Mantle ${MANTLE_NETWORK} (chainId ${MANTLE_CHAIN_ID}) — subscribing via ${MANTLE_WSS}`,
+    `[boot] HashKey Chain ${HASHKEY_NETWORK} (chainId ${HASHKEY_CHAIN_ID}) — subscribing via ${HASHKEY_WSS}`,
   );
 
   console.log("[boot] discovering pools…");

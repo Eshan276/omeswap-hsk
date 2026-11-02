@@ -2,15 +2,15 @@
  * Deep Research — On-Chain & Liquidity tools (P3).
  *
  * The on-chain ground-truth layer of the hybrid-retrieval moat (blueprint §1
- * agent #2, §6): direct Mantle reads that confirm or refute the market/web
+ * agent #2, §6): direct HashKey Chain reads that confirm or refute the market/web
  * narrative. These emit the highest trust tier — `onchain` — because they read
  * the chain itself rather than an aggregator.
  *
- *   • onchain_reader — ERC-20 facts for a Mantle token (name, symbol, decimals,
+ *   • onchain_reader — ERC-20 facts for a HashKey Chain token (name, symbol, decimals,
  *                      total supply, optional holder balance). Verifies a token
  *                      actually exists on-chain and what its real supply is.
  *   • dex_liquidity  — realistic tradability: routes a trade of a given size
- *                      through FusionX V3 (single + multi-hop) and reports the
+ *                      through HSKSwap (single + multi-hop) and reports the
  *                      price impact / slippage. Thin liquidity is a hard risk
  *                      flag even for a hot name.
  *
@@ -35,12 +35,8 @@ import {
 
 import { getChainConfig } from '@/lib/chain-registry'
 import type { TokenInfo } from '@/lib/chain-registry/types'
-import {
-  mantleChain,
-  MANTLE_RPC,
-  FUSIONX_V3_QUOTER_V2,
-} from '@/lib/chain-registry/chains/mantle'
-import { quoteFusionXBestTier, quoteFusionXMultiHop } from '@/lib/dex/fusionx'
+import { hashkeyChain, HASHKEY_RPC, HSKSWAP } from '@/lib/chain-registry/chains/hashkey'
+import { quoteHSKSwapBestTier, quoteHSKSwapMultiHop } from '@/lib/dex/hskswap'
 
 import type { Evidence } from '@/lib/research/types'
 import type { ResearchTool, ToolResult } from '@/lib/research/tools/types'
@@ -60,13 +56,13 @@ const ERC20_ABI = [
   },
 ] as const
 
-const STABLES = new Set(['USDC', 'USDT', 'DAI', 'USDE', 'MUSD'])
+const STABLES = new Set(['USDC', 'USDC.E', 'USDT', 'DAI', 'USDE'])
 
 // ── shared helpers ─────────────────────────────────────────────────────────────
 
-/** A public client bound to the registry's active Mantle chain + RPC. */
+/** A public client bound to the registry's active HashKey chain + RPC. */
 function buildClient(): PublicClient {
-  return createPublicClient({ chain: mantleChain, transport: http(MANTLE_RPC) })
+  return createPublicClient({ chain: hashkeyChain, transport: http(HASHKEY_RPC) })
 }
 
 interface ResolvedToken {
@@ -77,7 +73,7 @@ interface ResolvedToken {
 }
 
 /**
- * Resolve a token argument (symbol like "WMNT" or a raw 0x address) to an
+ * Resolve a token argument (symbol like "WHSK" or a raw 0x address) to an
  * on-chain address using the chain registry token list. Returns null when the
  * symbol is not listed on the active chain and the value is not a valid address.
  */
@@ -124,15 +120,15 @@ function listedSymbols(chainId: number): string {
 export const onchainReaderTool: ResearchTool = {
   name: 'onchain_reader',
   description:
-    'Read ERC-20 ground truth for a token on Mantle: name, symbol, decimals, total ' +
+    'Read ERC-20 ground truth for a token on HashKey Chain: name, symbol, decimals, total ' +
     'supply, and optionally a holder address balance. Use to verify a token actually ' +
     'exists on-chain and confirm its real supply against claimed tokenomics. Accepts ' +
-    'a listed symbol (e.g. WMNT, USDC) or a raw 0x token address.',
+    'a listed symbol (e.g. WHSK, USDT) or a raw 0x token address.',
   trustTier: 'onchain',
   parameters: {
     type: 'object',
     properties: {
-      token: { type: 'string', description: 'Token symbol (WMNT, USDC, USDT, WETH) or 0x address.' },
+      token: { type: 'string', description: 'Token symbol (WHSK, USDT, WETH, WBTC) or 0x address.' },
       holder: { type: 'string', description: 'Optional 0x address to read the token balance of.' },
     },
     required: ['token'],
@@ -143,7 +139,7 @@ export const onchainReaderTool: ResearchTool = {
     const token = resolveToken(asString(args.token), chainId)
     if (!token) {
       return fail(
-        `"${asString(args.token)}" is not a Mantle-listed token and is not a valid address. ` +
+        `"${asString(args.token)}" is not a HashKey-listed token and is not a valid address. ` +
           `Listed symbols: ${listedSymbols(chainId)}.`,
       )
     }
@@ -181,13 +177,13 @@ export const onchainReaderTool: ResearchTool = {
       const supplyStr = supplyHuman.toLocaleString(undefined, { maximumFractionDigits: 0 })
       const explorer = explorerAddr(chainId, token.address)
       const summary =
-        `${String(symbol)} (${String(name)}) on Mantle: total supply ${supplyStr}, ${dec} decimals` +
+        `${String(symbol)} (${String(name)}) on HashKey Chain: total supply ${supplyStr}, ${dec} decimals` +
         (holder ? `; holder ${holder.slice(0, 8)}… holds ${holderBalance?.toLocaleString() ?? 'n/a'}.` : '.')
 
       const ev: Evidence[] = [
         evidence(
           `${String(symbol)} on-chain total supply is ${supplyStr} (${dec} decimals).`,
-          'Mantle RPC',
+          'HashKey Chain RPC',
           'onchain',
           {
             address: token.address,
@@ -204,7 +200,7 @@ export const onchainReaderTool: ResearchTool = {
       return ok(summary, ev)
     } catch (err) {
       return fail(
-        err instanceof Error ? err.message : `On-chain read failed for ${token.symbol} on Mantle.`,
+        err instanceof Error ? err.message : `On-chain read failed for ${token.symbol} on HashKey Chain.`,
       )
     }
   },
@@ -215,17 +211,17 @@ export const onchainReaderTool: ResearchTool = {
 export const dexLiquidityTool: ResearchTool = {
   name: 'dex_liquidity',
   description:
-    'Assess real tradability on Mantle by routing a trade of a given size through ' +
-    'FusionX V3 (direct + multi-hop) and reporting the expected output and price ' +
+    'Assess real tradability on HashKey Chain by routing a trade of a given size through ' +
+    'HSKSwap (direct + multi-hop) and reporting the expected output and price ' +
     'impact / slippage at that size. Use to answer "can this be traded at size?" — ' +
     'high price impact means thin liquidity (a material risk regardless of hype). ' +
-    'Quote token defaults to USDC; sizes are interpreted in USD for stablecoin quotes.',
+    'Quote token defaults to USDT; sizes are interpreted in USD for stablecoin quotes.',
   trustTier: 'onchain',
   parameters: {
     type: 'object',
     properties: {
       token: { type: 'string', description: 'Target token to assess (symbol or 0x address).' },
-      quote: { type: 'string', description: 'Quote/funding token symbol (default USDC).' },
+      quote: { type: 'string', description: 'Quote/funding token symbol (default USDT).' },
       tradeSizeUsd: { type: 'number', description: 'Trade size to probe (default 1000). USD when the quote is a stablecoin.' },
     },
     required: ['token'],
@@ -246,7 +242,7 @@ export const dexLiquidityTool: ResearchTool = {
     }
     if (!hasRouters) {
       return fail(
-        'No DEX routers are configured on the active Mantle network (DEX quoting is ' +
+        'No DEX routers are configured on the active HashKey network (DEX quoting is ' +
           'mainnet-only). Fall back to trading-volume as a liquidity proxy and note the gap.',
       )
     }
@@ -254,14 +250,14 @@ export const dexLiquidityTool: ResearchTool = {
     const target = resolveToken(asString(args.token), chainId)
     if (!target) {
       return fail(
-        `"${asString(args.token)}" is not a Mantle-listed token / valid address. ` +
+        `"${asString(args.token)}" is not a HashKey-listed token / valid address. ` +
           `Listed: ${listedSymbols(chainId)}.`,
       )
     }
 
-    const quoteSym = asString(args.quote) || 'USDC'
+    const quoteSym = asString(args.quote) || 'USDT'
     const quote = resolveToken(quoteSym, chainId)
-    if (!quote) return fail(`Quote token "${quoteSym}" is not listed on Mantle.`)
+    if (!quote) return fail(`Quote token "${quoteSym}" is not listed on HashKey Chain.`)
     if (quote.address.toLowerCase() === target.address.toLowerCase()) {
       return fail('Target and quote tokens are identical — choose a different quote token.')
     }
@@ -285,12 +281,12 @@ export const dexLiquidityTool: ResearchTool = {
 
     if (!full) {
       return ok(
-        `No FusionX V3 route with liquidity for ${quote.symbol}→${target.symbol} at ${sizeLabel}. ` +
-          'This indicates the pair cannot be traded at this size on Mantle (very thin / no liquidity).',
+        `No HSKSwap route with liquidity for ${quote.symbol}→${target.symbol} at ${sizeLabel}. ` +
+          'This indicates the pair cannot be traded at this size on HashKey Chain (very thin / no liquidity).',
         [
           evidence(
-            `${target.symbol} has no tradable FusionX route from ${quote.symbol} at ${sizeLabel} on Mantle.`,
-            'FusionX V3 (Mantle)',
+            `${target.symbol} has no tradable HSKSwap route from ${quote.symbol} at ${sizeLabel} on HashKey Chain.`,
+            'HSKSwap (HashKey Chain)',
             'onchain',
             {
               target: target.symbol,
@@ -329,8 +325,8 @@ export const dexLiquidityTool: ResearchTool = {
 
     return ok(summary, [
       evidence(
-        `${target.symbol} is tradable from ${quote.symbol} at ${sizeLabel} via FusionX (${route}), ${impactStr}.`,
-        'FusionX V3 (Mantle)',
+        `${target.symbol} is tradable from ${quote.symbol} at ${sizeLabel} via HSKSwap (${route}), ${impactStr}.`,
+        'HSKSwap (HashKey Chain)',
         'onchain',
         {
           target: target.symbol,
@@ -360,7 +356,7 @@ interface BestQuote {
   via?: string
 }
 
-/** Best of single-hop and 2-hop FusionX quotes; null when no route has liquidity. */
+/** Best of single-hop and 2-hop HSKSwap quotes; null when no route has liquidity. */
 async function bestQuote(
   client: PublicClient,
   tokenIn: Address,
@@ -368,10 +364,10 @@ async function bestQuote(
   amountIn: bigint,
   hubTokens: Address[],
 ): Promise<BestQuote | null> {
-  const quoter = FUSIONX_V3_QUOTER_V2 as Address
+  const quoter = HSKSWAP.quoterV2
   const [single, multi] = await Promise.all([
-    quoteFusionXBestTier(client, { tokenIn, tokenOut, amountIn, quoter }).catch(() => null),
-    quoteFusionXMultiHop(client, { tokenIn, tokenOut, amountIn, hubTokens, quoter }).catch(() => null),
+    quoteHSKSwapBestTier(client, { tokenIn, tokenOut, amountIn, quoter }).catch(() => null),
+    quoteHSKSwapMultiHop(client, { tokenIn, tokenOut, amountIn, hubTokens, quoter }).catch(() => null),
   ])
 
   let best: BestQuote | null = null

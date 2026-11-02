@@ -1,6 +1,6 @@
 export type DexMarketKind = "spot" | "perp";
 export type DexDisplayToken = "base" | "quote";
-export type DexSource = "geckoterminal" | "dexscreener" | "binance" | "fallback";
+export type DexSource = "geckoterminal" | "dexscreener" | "binance" | "onchain" | "fallback";
 
 export type DexMarket = {
   id: string;

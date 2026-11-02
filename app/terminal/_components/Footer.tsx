@@ -5,7 +5,7 @@ export function Footer() {
     <footer className="h-8 border-t border-border bg-background flex items-center gap-4 px-4 text-xs text-muted-foreground">
       <span className="flex items-center gap-1.5">
         <span className="h-1.5 w-1.5 rounded-full bg-bull animate-pulse" />
-        <span className="text-foreground/80">Mantle · Onchain data live</span>
+        <span className="text-foreground/80">HashKey Chain · Onchain data live</span>
       </span>
       <span className="ml-auto flex items-center gap-4">
         <a className="hover:text-foreground" href="#">Terms</a>

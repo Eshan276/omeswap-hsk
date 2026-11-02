@@ -342,7 +342,7 @@ export default function DecisionReceiptDrawer() {
             )}
           </Section>
 
-          <Section title="Mantle Execution">
+          <Section title="HashKey Execution">
             <div
               className="rounded-[20px] p-3"
               style={{

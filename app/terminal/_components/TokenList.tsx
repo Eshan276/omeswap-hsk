@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { DexMarket } from "@/lib/dex/types";
+import { isHashKeyNetwork } from "@/lib/dex/markets";
 import { TokenIcon } from "./Icon";
 
 type MarketsResponse = {
@@ -54,13 +55,13 @@ export function TokenList({
   }, []);
 
   const totalVolume = useMemo(
-    () => markets.filter((m) => m.network === "mantle" && m.kind === "spot").reduce((sum, m) => sum + m.volume24hUsd, 0),
+    () => markets.filter((m) => isHashKeyNetwork(m.network) && m.kind === "spot").reduce((sum, m) => sum + m.volume24hUsd, 0),
     [markets],
   );
   const visibleMarkets = useMemo(() => {
-    return markets.filter((market) => market.network === "mantle" && market.kind === "spot");
+    return markets.filter((market) => isHashKeyNetwork(market.network) && market.kind === "spot");
   }, [markets]);
-  const sectionLabel = "Mantle Spot markets";
+  const sectionLabel = "HashKey Chain spot markets";
   const footerLabel = "24h spot volume";
 
   return (

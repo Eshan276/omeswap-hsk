@@ -1,5 +1,5 @@
 /**
- * Own WebSocket broadcast server. One process holds the single Mantle
+ * Own WebSocket broadcast server. One process holds the single HashKey Chain
  * subscription (subscriber.ts) and fans every update out to all connected
  * frontend clients here — so N browsers cost one RPC connection, not N.
  *

@@ -20,7 +20,11 @@ import type { Candle, DataBundle } from '@/lib/ats/types'
 
 const TICKER_TO_ID: Record<string, string> = {
   BTC: 'bitcoin',
+  WBTC: 'bitcoin',
+  HSK: 'hashkey-ecopoints',
+  WHSK: 'hashkey-ecopoints',
   ETH: 'ethereum',
+  WETH: 'ethereum',
   SOL: 'solana',
   AVAX: 'avalanche-2',
   BNB: 'binancecoin',

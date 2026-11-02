@@ -23,9 +23,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { FUSIONX_SWAP_URL } from "@/lib/dex/fusionx";
+import { HSKSWAP_SWAP_URL } from "@/lib/dex/hskswap";
 
-// Map pool IDs to token pairs — matches actual deployment on Mantle Sepolia
+// OmeSwap AMM pool IDs (contract/) → token pairs. Update after deploying the
+// AMM to HashKey Chain and creating pools.
 const POOL_PAIRS: { [key: string]: { token0: string; token1: string } } = {
   "1": { token0: "OmE", token1: "USDO" },
 };
@@ -37,8 +38,8 @@ export default function PoolPage() {
   const { address, isConnected } = useWallet();
   const [timeRange, setTimeRange] = useState("1D");
   const [showSwap, setShowSwap] = useState(false);
-  const openFusionXSwap = () => {
-    window.open(FUSIONX_SWAP_URL, "_blank", "noopener,noreferrer");
+  const openHSKSwap = () => {
+    window.open(HSKSWAP_SWAP_URL, "_blank", "noopener,noreferrer");
   };
 
   const poolPair = POOL_PAIRS[poolId];
@@ -128,7 +129,7 @@ export default function PoolPage() {
                         </Badge>
                       )}
                       <Badge variant="secondary" className="text-xs">
-                        FusionX DEX
+                        HSKSwap DEX
                       </Badge>
                       <Badge variant="secondary" className="text-xs">
                         0.3% Fee
@@ -352,9 +353,9 @@ export default function PoolPage() {
                 <Button
                   className="flex-1"
                   variant="outline"
-                  onClick={openFusionXSwap}
+                  onClick={openHSKSwap}
                 >
-                  Open FusionX
+                  Open HSKSwap
                 </Button>
               </div>
             )}
@@ -532,7 +533,7 @@ export default function PoolPage() {
                 </div>
                 <div>
                   <div className="text-muted-foreground mb-1">Network</div>
-                  <div className="font-medium">Mantle Network</div>
+                  <div className="font-medium">HashKey Chain</div>
                 </div>
               </div>
             </Card>
@@ -547,18 +548,18 @@ export default function PoolPage() {
                   <Button
                     className="w-full justify-start"
                     variant="outline"
-                    onClick={openFusionXSwap}
+                    onClick={openHSKSwap}
                   >
                     <Droplet className="w-4 h-4 mr-2" />
-                    Open FusionX
+                    Open HSKSwap
                   </Button>
                   <Button
                     className="w-full justify-start"
                     variant="outline"
-                    onClick={openFusionXSwap}
+                    onClick={openHSKSwap}
                   >
                     <RefreshCw className="w-4 h-4 mr-2" />
-                    Swap on FusionX
+                    Swap on HSKSwap
                   </Button>
                   <Button
                     className="w-full justify-start"

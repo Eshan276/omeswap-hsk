@@ -5,8 +5,8 @@ import { PoolComparisonPanel } from "@/components/trade/PoolComparisonPanel";
 import { SwapCardDex } from "@/components/trade/SwapCardDex";
 
 export default function TradePage() {
-  const [tokenIn, setTokenIn] = useState("OmE");
-  const [tokenOut, setTokenOut] = useState("USDO");
+  const [tokenIn, setTokenIn] = useState("WHSK");
+  const [tokenOut, setTokenOut] = useState("USDT");
 
   return (
     <div className="min-h-screen bg-transparent relative z-10">
@@ -15,7 +15,7 @@ export default function TradePage() {
           <section className="space-y-4">
             <div>
               <h1 className="text-2xl font-semibold">Trade</h1>
-              <p className="text-sm text-muted-foreground">Jaine on Mantle</p>
+              <p className="text-sm text-muted-foreground">Best-route swaps via HSKSwap on HashKey Chain</p>
             </div>
             <SwapCardDex onTokensChange={(i, o) => { setTokenIn(i); setTokenOut(o); }} />
           </section>

@@ -22,11 +22,11 @@ import type { StrategyDraftPayload } from "@/lib/marketplace/validate-strategy"
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const ASSET_PAIR_PRESETS = [
-  "WMNT/USDC",
+  "WHSK/USDT",
   "WETH/USDC",
   "WBTC/USDC",
-  "WMNT/USDT",
-  "WETH/WMNT",
+  "WETH/USDT",
+  "WBTC/USDT",
 ]
 
 const REGIME_OPTIONS = ["bull", "bear", "sideways", "volatile", "ranging"]
@@ -35,7 +35,7 @@ const STRAT_KEY = "omeswap_draft_strategy_id"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type PricingToken = "free" | "MNT" | "USDC"
+type PricingToken = "free" | "HSK" | "USDC"
 
 type WizardState = {
   // Step 1 — Details
@@ -202,7 +202,7 @@ export function PublishWizard({ onClose }: PublishWizardProps) {
     slippageBps: "75",
     isFree: true,
     priceAmount: "",
-    priceToken: "MNT",
+    priceToken: "HSK",
     payoutWallet: wallet ?? "",
   })
 
@@ -618,7 +618,7 @@ export function PublishWizard({ onClose }: PublishWizardProps) {
               </p>
               <p className="mt-0.5 text-[11px] text-violet-400/70">
                 The compiled graph and execution logic will be AES-256-GCM encrypted
-                and stored on Mantle Storage. Only the public summary and performance
+                and stored on 0G Storage. Only the public summary and performance
                 metrics are visible to other users.
               </p>
             </div>
@@ -662,7 +662,7 @@ export function PublishWizard({ onClose }: PublishWizardProps) {
                 </Field>
                 <Field label="Token">
                   <div className="flex rounded-lg border border-zinc-700 p-1 gap-1">
-                    {(["MNT", "USDC"] as PricingToken[]).map((t) => (
+                    {(["HSK", "USDC"] as PricingToken[]).map((t) => (
                       <button
                         key={t}
                         type="button"
@@ -770,7 +770,7 @@ export function PublishWizard({ onClose }: PublishWizardProps) {
             <Lock className="h-3.5 w-3.5 text-violet-400 shrink-0 mt-0.5" />
             <span>
               The strategy graph will be encrypted with AES-256-GCM and uploaded
-              to Mantle Storage. An AI-generated public summary will be created from
+              to 0G Storage. An AI-generated public summary will be created from
               your strategy without exposing the logic.
             </span>
           </div>

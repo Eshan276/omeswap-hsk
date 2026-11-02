@@ -7,7 +7,7 @@
  *
  * Request body (JSON):
  *   {
- *     chainId?  : number     — defaults to DEFAULT_CHAIN_ID (Mantle, 5000/5003)
+ *     chainId?  : number     — defaults to DEFAULT_CHAIN_ID (HashKey Chain, 177/133)
  *     tokens?   : string[]   — ERC-20 addresses to sweep; omit/empty for native only
  *     gasReserve?: string    — native units to keep for future gas (default "0.001")
  *   }

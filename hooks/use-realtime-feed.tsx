@@ -24,7 +24,7 @@ export function useRealtimePrices(): Record<string, number> {
   );
 }
 
-/** Live USD price for a single token symbol (e.g. "WMNT"). */
+/** Live USD price for a single token symbol (e.g. "WHSK"). */
 export function useRealtimePrice(symbol: string | undefined): number | undefined {
   const prices = useRealtimePrices();
   return symbol ? prices[symbol] : undefined;
@@ -61,7 +61,7 @@ function toReserves(p: WirePool) {
 }
 
 /** Preferred quote tokens, deepest/most-stable first. */
-const QUOTE_PREFERENCE = ["USDC", "USDT0", "USDT", "WMNT"];
+const QUOTE_PREFERENCE = ["USDT", "USDC", "WHSK"];
 
 /**
  * Find the best tracked pair for a base symbol from the live pool cache:
@@ -88,8 +88,8 @@ function resolvePairForSymbol(symbol: string): string | null {
 
 /**
  * Subscribes the chart store to live trades + reserves for the active terminal
- * symbol. `symbolOrPair` may be a base symbol ("WMNT") — resolved to the best
- * quote pair from the live cache — or an explicit pair ("WMNT/USDC"). Returns
+ * symbol. `symbolOrPair` may be a base symbol ("WHSK") — resolved to the best
+ * quote pair from the live cache — or an explicit pair ("WHSK/USDC"). Returns
  * the connection status; when not "live" the caller can show stale/fallback UI.
  */
 export function useRealtimeTerminalFeed(

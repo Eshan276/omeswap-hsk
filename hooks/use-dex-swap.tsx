@@ -27,7 +27,7 @@ export function useDexSwap() {
   const poolsAddress = (chainConfig.omeswapPools ?? '0x0000000000000000000000000000000000000000') as Address;
 
   const publicClient = usePublicClient({ chainId });
-  const [tokenIn, setTokenIn] = useState<string>("WMNT");
+  const [tokenIn, setTokenIn] = useState<string>("WHSK");
   const [tokenOut, setTokenOut] = useState<string>("USDC");
   const [amountIn, setAmountIn] = useState<string>("");
   const [slippage, setSlippage] = useState<number>(0.5); // 0.5%

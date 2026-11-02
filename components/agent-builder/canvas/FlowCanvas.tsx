@@ -72,7 +72,7 @@ export default function FlowCanvas() {
     return last.timestamp.toLocaleTimeString();
   }, [logs]);
 
-  // Mantle exposure: sum amountIn from all swap nodes
+  // HashKey Chain exposure: sum amountIn from all swap nodes
   const chainExposure = useMemo(() => {
     let total = 0;
     for (const node of nodes) {
@@ -311,7 +311,7 @@ export default function FlowCanvas() {
                 chainExposure > 5 ? "text-amber-400/70" : "text-white/25"
               }
             >
-              Exposure: {chainExposure.toFixed(4)} WMNT
+              Exposure: {chainExposure.toFixed(4)} WHSK
             </span>
           </>
         )}

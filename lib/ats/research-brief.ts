@@ -63,7 +63,7 @@ function buildExecutionSummary(
     return {
       mode,
       status: 'submitted',
-      summary: `Execution submitted on Mantle chain ${chainId} with ${executionResult.token_in} -> ${executionResult.token_out}.`,
+      summary: `Execution submitted on HashKey Chain ${chainId} with ${executionResult.token_in} -> ${executionResult.token_out}.`,
       chain_id: chainId,
       tx_hash: executionResult.tx_hash,
     }

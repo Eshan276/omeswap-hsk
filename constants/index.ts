@@ -17,7 +17,7 @@ export const ROUTES = {
 export const EXTERNAL_LINKS = {
   DOCS: 'https://docs.0g.ai',
   GITHUB: 'https://github.com/0glabs',
-  EXPLORER: 'https://explorer.mantle.xyz',
+  EXPLORER: 'https://hashkey.blockscout.com',
   STORAGE_DOCS: 'https://docs.0g.ai/0g-storage',
   COMPUTE_DOCS: 'https://docs.0g.ai/0g-compute',
   DA_DOCS: 'https://docs.0g.ai/0g-da',

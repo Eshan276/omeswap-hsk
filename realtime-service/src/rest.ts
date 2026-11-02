@@ -2,7 +2,7 @@
  * REST layer (node:http, no framework). Serves first-paint / SSR reads and the
  * swap-route endpoint:
  *   GET /health                                  liveness + pool/client counts
- *   GET /price[?symbol=WMNT]                      USD prices (all, or one)
+ *   GET /price[?symbol=WHSK]                      USD prices (all, or one)
  *   GET /pools                                    current pool snapshot
  *   GET /route?tokenIn=&tokenOut=&amountIn=       best in-memory route estimate
  *   GET /markets[?id=]                            curated market list / one market

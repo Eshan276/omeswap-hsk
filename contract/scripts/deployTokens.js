@@ -69,7 +69,7 @@ async function main() {
   console.log("  token1:", info[1]);
 
   console.log("\n" + "=".repeat(60));
-  console.log("COPY THESE INTO the testnet branch of lib/chain-registry/chains/mantle.ts:");
+  console.log("COPY THESE INTO the testnet branch of lib/chain-registry/chains/hashkey.ts:");
   console.log("=".repeat(60));
   console.log(`  OmE:  "${omeAddr}"`);
   console.log(`  USDO: "${usdoAddr}"`);

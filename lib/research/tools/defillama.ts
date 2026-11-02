@@ -262,13 +262,13 @@ export const defillamaTool: ResearchTool = {
     'returns top protocols by TVL (filter by chain/category, or pass protocol=<name> ' +
     'for one); mode="yields" returns top pools by APY (filter by chain/symbol, set ' +
     'stablecoin=true for stable yield). Use TVL as a health/trust signal and APY for ' +
-    '"where to park funds" questions. Mantle-chain filters surface on-chain-relevant venues.',
+    '"where to park funds" questions. HashKey-chain filters surface on-chain-relevant venues.',
   trustTier: 'market_data',
   parameters: {
     type: 'object',
     properties: {
       mode: { type: 'string', enum: ['protocols', 'yields'], description: 'Which dataset to query. Default "protocols".' },
-      chain: { type: 'string', description: 'Filter by chain, e.g. "Mantle", "Ethereum". Optional.' },
+      chain: { type: 'string', description: 'Filter by chain, e.g. "HashKey Chain", "Ethereum". Optional.' },
       category: { type: 'string', description: 'protocols mode: filter by category, e.g. "Lending", "Dexes". Optional.' },
       protocol: { type: 'string', description: 'protocols mode: look up a single protocol by name/slug. Optional.' },
       symbol: { type: 'string', description: 'yields mode: filter pools by asset symbol, e.g. "USDC". Optional.' },

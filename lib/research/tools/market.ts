@@ -51,7 +51,7 @@ export const priceSnapshotTool: ResearchTool = {
   parameters: {
     type: 'object',
     properties: {
-      ticker: { type: 'string', description: 'Asset symbol, e.g. BTC, ETH, WMNT.' },
+      ticker: { type: 'string', description: 'Asset symbol, e.g. BTC, ETH, WHSK.' },
     },
     required: ['ticker'],
     additionalProperties: false,

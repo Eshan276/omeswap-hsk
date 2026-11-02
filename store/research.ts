@@ -230,8 +230,8 @@ const AGENT_META: Record<AgentName, { label: string; roleLabel: string; processL
   },
   execution: {
     label: 'Execution Agent',
-    roleLabel: 'Mantle Execution',
-    processLabel: 'Mantle execution readiness and approval state',
+    roleLabel: 'HashKey Execution',
+    processLabel: 'HashKey execution readiness and approval state',
   },
 }
 

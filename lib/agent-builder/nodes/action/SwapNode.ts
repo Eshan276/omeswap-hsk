@@ -7,13 +7,13 @@ import type {
 import { useTransactionStore } from "@/store/transaction-store";
 import { getChainConfig, getDefaultChainId } from "@/lib/chain-registry";
 import { normalizeWalletAddress } from "@/lib/onboarding";
-import { FUSIONX_DEX_NAME } from "@/lib/dex/fusionx";
+import { HSKSWAP_DEX_NAME } from "@/lib/dex/hskswap";
 
 // Resolved once at module load from the chain registry
 const _config = getChainConfig(getDefaultChainId());
 const _nativeSymbol = _config.chain.nativeCurrency.symbol;
 const _dexNames = _config.dexRouters.map((r) => r.name);
-const _defaultDex = _dexNames[0] ?? FUSIONX_DEX_NAME;
+const _defaultDex = _dexNames[0] ?? HSKSWAP_DEX_NAME;
 const _tokenSymbols = Object.keys(_config.tokens);
 
 function normalizeTokenKey(value: string) {
@@ -25,7 +25,7 @@ function normalizeTokenKey(value: string) {
 export class SwapNode extends BaseNode {
   readonly type = "swap";
   readonly label = "Swap";
-  readonly description = `Executes a token swap on ${_dexNames.join(" or ") || FUSIONX_DEX_NAME}`;
+  readonly description = `Executes a token swap on ${_dexNames.join(" or ") || HSKSWAP_DEX_NAME}`;
   readonly icon = "Repeat2";
   readonly category = "action" as const;
   readonly color = "border-green-500";
@@ -53,7 +53,7 @@ export class SwapNode extends BaseNode {
       key: "dex",
       label: "DEX",
       type: "select",
-      options: _dexNames.length ? _dexNames : [FUSIONX_DEX_NAME],
+      options: _dexNames.length ? _dexNames : [HSKSWAP_DEX_NAME],
       default: _defaultDex,
     },
     {
@@ -69,7 +69,7 @@ export class SwapNode extends BaseNode {
       label: "Token Out",
       type: "select",
       options: _tokenSymbols,
-      default: "WMNT",
+      default: "WHSK",
     },
     {
       key: "amountIn",
@@ -97,7 +97,7 @@ export class SwapNode extends BaseNode {
 
     const dex = (this.config.dex as string) || _defaultDex;
     const tokenIn = normalizeTokenKey((this.config.tokenIn as string) || "USDC");
-    const tokenOut = normalizeTokenKey((this.config.tokenOut as string) || "WMNT");
+    const tokenOut = normalizeTokenKey((this.config.tokenOut as string) || "WHSK");
     const amountIn = Number(this.config.amountIn ?? this.config.amount ?? 0.1);
     const slippage = (this.config.slippage as number) || 0.5;
 

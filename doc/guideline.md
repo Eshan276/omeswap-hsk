@@ -1,16 +1,16 @@
-# Mantle Chain & 0G Integration Guideline
+# HashKey Chain & 0G Integration Guideline
 
 This guide explains what to create, edit, or delete when you want to:
 
-1. **Work with the Mantle chain config** (add DEXes, update tokens, change RPC)
+1. **Work with the HashKey Chain config** (add DEXes, update tokens, change RPC)
 2. **Integrate 0G Storage** (persistent agent memory — KV state + Log history)
 3. **Integrate 0G Compute** (decentralized AI inference — qwen3, GLM-5-FP8)
 4. **Integrate 0G DA** (data availability for high-throughput agent output)
-5. **Add a new chain** alongside Mantle (multi-chain support)
-6. **Add or remove a DEX** on Mantle
+5. **Add a new chain** alongside HashKey Chain (multi-chain support)
+6. **Add or remove a DEX** on HashKey Chain
 
-> **Trading chain vs. AI infra.** The DEX trades on **Mantle** (config in
-> `lib/chain-registry/chains/mantle.ts`). 0G's Storage / Compute / DA are used as
+> **Trading chain vs. AI infra.** The DEX trades on **HashKey Chain** (config in
+> `lib/chain-registry/chains/hashkey.ts`). 0G's Storage / Compute / DA are used as
 > **external AI/data services**, independent of the trading chain — their config
 > lives in `lib/zerog/config.ts`, not in the chain registry.
 
@@ -27,7 +27,7 @@ lib/chain-registry/
   types.ts              ← type definitions (rarely touch)
   index.ts              ← registry lookup + DEFAULT_CHAIN_ID (touch to swap default chain)
   chains/
-    mantle.ts           ← ALL Mantle addresses, RPC, DEX routers, tokens (touch to edit Mantle)
+    hashkey.ts           ← ALL HashKey Chain addresses, RPC, DEX routers, tokens (touch to edit HashKey Chain)
     polygon.ts          ← (create this for another chain, if needed)
 
 lib/zerog/
@@ -42,14 +42,14 @@ lib/zerog/
 
 ## Core Components
 
-### 1. Mantle Chain (EVM-compatible L2 — the trading chain)
-- **Chain ID**: 5000 (Mainnet) / 5003 (Sepolia Testnet)
-- **RPC**: `https://rpc.mantle.xyz` (mainnet) / `https://rpc.sepolia.mantle.xyz` (testnet)
-- **Explorer**: `https://explorer.mantle.xyz` / `https://explorer.sepolia.mantle.xyz`
-- **Native token**: MNT (18 decimals)
-- **DEXes**: FusionX V3, Agni Finance, Merchant Moe
-- Config file: `lib/chain-registry/chains/mantle.ts`
-- Select network with `NEXT_PUBLIC_MANTLE_NETWORK=mainnet|testnet`
+### 1. HashKey Chain (EVM-compatible L2 — the trading chain)
+- **Chain ID**: 177 (Mainnet) / 133 (Sepolia Testnet)
+- **RPC**: `https://mainnet.hsk.xyz` (mainnet) / `https://testnet.hsk.xyz` (testnet)
+- **Explorer**: `https://hashkey.blockscout.com` / `https://testnet-explorer.hsk.xyz`
+- **Native token**: HSK (18 decimals)
+- **DEXes**: HSKSwap (Uniswap V3 fork; SwapRouter02 + QuoterV2)
+- Config file: `lib/chain-registry/chains/hashkey.ts`
+- Select network with `NEXT_PUBLIC_HASHKEY_NETWORK=mainnet|testnet`
 
 ### 2. 0G Storage (decentralized persistent memory)
 - **Use for**: agent KV state (real-time), conversation/decision history (Log)
@@ -119,27 +119,27 @@ const isAvailable = await verifyDAAvailability(proof)
 
 ---
 
-## Scenario 1: Edit the Mantle Chain Config
+## Scenario 1: Edit the HashKey Chain Config
 
-Everything Mantle-specific is in **one file**: `lib/chain-registry/chains/mantle.ts`.
+Everything HashKey Chain-specific is in **one file**: `lib/chain-registry/chains/hashkey.ts`.
 
 ### Change the RPC URL
 
 ```typescript
-// lib/chain-registry/chains/mantle.ts (or override via env)
-export const MANTLE_RPC = 'https://your-custom-rpc.mantle.xyz'   // ← change this
-// Env override: NEXT_PUBLIC_MANTLE_RPC
+// lib/chain-registry/chains/hashkey.ts (or override via env)
+export const HASHKEY_RPC = 'https://your-custom-mainnet.hsk.xyz'   // ← change this
+// Env override: NEXT_PUBLIC_HASHKEY_RPC
 ```
 
 ### Update DEX router addresses
 
-Update the `dexRouters` array (FusionX V3, Agni, Merchant Moe are configured by default):
+Update the `dexRouters` array (HSKSwap is configured by default):
 
 ```typescript
 dexRouters: [
   {
-    id: 'fusionx_v3',
-    name: 'FusionX V3',
+    id: 'hskswap',
+    name: 'HSKSwap',
     type: 'custom',
     routerAddress: '0x5989FB161568b9F133eDf5Cf6787f5597762797F' as Address,
   },
@@ -148,7 +148,7 @@ dexRouters: [
 
 ### Update OmeSwap contract addresses
 
-After deploying the OmeSwap AMM to Mantle (source in `0g-contract/`):
+After deploying the OmeSwap AMM to HashKey Chain (source in `contract/`):
 
 ```typescript
 omeswapPools:  '0xYourDeployedPoolsAddress...' as Address,
@@ -170,22 +170,22 @@ tokens: {
 },
 ```
 
-### What updates automatically after editing mantle.ts
+### What updates automatically after editing hashkey.ts
 
 | What changes automatically | Why |
 |---|---|
-| Wallet provider supports Mantle | `WalletProvider` calls `getSupportedChains()` |
-| Swap hooks use Mantle DEX routers | `useDexAggregator` calls `getChainConfig(chainId)` |
-| Explorer links point to Mantle explorer | `getExplorerLink(chainId, 'tx', hash)` reads from config |
-| Agent builder nodes show Mantle tokens | They call `getChainConfig(getDefaultChainId())` |
+| Wallet provider supports HashKey Chain | `WalletProvider` calls `getSupportedChains()` |
+| Swap hooks use HashKey Chain DEX routers | `useDexAggregator` calls `getChainConfig(chainId)` |
+| Explorer links point to HashKey Chain explorer | `getExplorerLink(chainId, 'tx', hash)` reads from config |
+| Agent builder nodes show HashKey Chain tokens | They call `getChainConfig(getDefaultChainId())` |
 
 ---
 
-## Scenario 2: Switch to a Different Chain (Replace Mantle)
+## Scenario 2: Switch to a Different Chain (Replace HashKey Chain)
 
 ### Step 1 — Create the chain config file
 
-Create `lib/chain-registry/chains/<your-chain>.ts`. Use `mantle.ts` as your template:
+Create `lib/chain-registry/chains/<your-chain>.ts`. Use `hashkey.ts` as your template:
 
 ```typescript
 import { defineChain } from 'viem'        // or: import { polygon } from 'viem/chains'
@@ -216,7 +216,7 @@ Open `lib/chain-registry/index.ts` and make two changes:
 // 1. Import your new config
 import { myChainConfig } from './chains/my-chain'
 
-// 2. Add it to the registry (remove mantleConfig if replacing entirely)
+// 2. Add it to the registry (remove hashkeyConfig if replacing entirely)
 const REGISTRY: Record<number, ChainConfig> = {
   [myChainConfig.chain.id]: myChainConfig,
 }
@@ -227,33 +227,33 @@ export const DEFAULT_CHAIN_ID: number = myChainConfig.chain.id
 
 ---
 
-## Scenario 3: Add a New Chain Alongside Mantle (Multi-Chain)
+## Scenario 3: Add a New Chain Alongside HashKey Chain (Multi-Chain)
 
-Keep Mantle and add another chain. In `lib/chain-registry/index.ts`:
+Keep HashKey Chain and add another chain. In `lib/chain-registry/index.ts`:
 
 ```typescript
-import { mantleConfig }  from './chains/mantle'
+import { hashkeyConfig }  from './chains/hashkey'
 import { polygonConfig } from './chains/polygon'   // ← new
 
 const REGISTRY: Record<number, ChainConfig> = {
-  [mantleConfig.chain.id]:  mantleConfig,
+  [hashkeyConfig.chain.id]:  hashkeyConfig,
   [polygonConfig.chain.id]: polygonConfig,   // ← add here
 }
 
-// Keep Mantle as the default
-export const DEFAULT_CHAIN_ID: number = mantleConfig.chain.id
+// Keep HashKey Chain as the default
+export const DEFAULT_CHAIN_ID: number = hashkeyConfig.chain.id
 ```
 
 ---
 
-## Scenario 4: Add a New DEX to Mantle
+## Scenario 4: Add a New DEX to HashKey Chain
 
-Open `lib/chain-registry/chains/mantle.ts` and add an entry to `dexRouters`:
+Open `lib/chain-registry/chains/hashkey.ts` and add an entry to `dexRouters`:
 
 ```typescript
 dexRouters: [
-  { id: 'fusionx_v3',   name: 'FusionX V3',   type: 'custom',      routerAddress: '0x...' as Address },
-  { id: 'agni_v3',      name: 'Agni Finance', type: 'custom',      routerAddress: '0x...' as Address },
+  { id: 'hskswap',   name: 'HSKSwap',   type: 'custom',      routerAddress: '0x...' as Address },
+  { id: 'my_v3_fork',   name: 'My V3 Fork',   type: 'custom',      routerAddress: '0x...' as Address },
   // ↓ NEW DEX
   {
     id: 'new_dex',
@@ -271,7 +271,7 @@ Liquidity-Book) routers also need quote logic in `hooks/use-dex-aggregator.tsx`.
 
 ## Scenario 5: Remove a DEX
 
-Delete the entry from `dexRouters` in `lib/chain-registry/chains/mantle.ts`. It
+Delete the entry from `dexRouters` in `lib/chain-registry/chains/hashkey.ts`. It
 immediately disappears from all swap UIs, agent nodes, and quote logic.
 
 Also remove the fallback in `contracts/config.ts` if you want to keep it clean.
@@ -340,16 +340,16 @@ export class ZeroGComputeNode extends BaseNode {
 
 | What you want to do | File(s) to edit |
 |---|---|
-| Change Mantle RPC URL | `lib/chain-registry/chains/mantle.ts` — edit `MANTLE_RPC` (or `NEXT_PUBLIC_MANTLE_RPC`) |
-| Switch Mantle mainnet/testnet | env `NEXT_PUBLIC_MANTLE_NETWORK=mainnet\|testnet` |
+| Change HashKey Chain RPC URL | `lib/chain-registry/chains/hashkey.ts` — edit `HASHKEY_RPC` (or `NEXT_PUBLIC_HASHKEY_RPC`) |
+| Switch HashKey Chain mainnet/testnet | env `NEXT_PUBLIC_HASHKEY_NETWORK=mainnet\|testnet` |
 | Update 0G Storage endpoint | `lib/zerog/config.ts` — edit `storageIndexerUrl` |
 | Update 0G Compute endpoint | `lib/zerog/config.ts` — edit `ZEROG_COMPUTE_ENDPOINT` |
 | Update 0G DA endpoint | `lib/zerog/config.ts` — edit `daRpcUrl` |
-| Add a DEX (UniswapV2-compatible) | `lib/chain-registry/chains/mantle.ts` — add entry to `dexRouters` |
-| Add a DEX (custom interface) | `lib/chain-registry/chains/mantle.ts` + add quote logic in `hooks/use-dex-aggregator.tsx` |
-| Remove a DEX | `lib/chain-registry/chains/mantle.ts` — remove entry from `dexRouters` |
-| Add/edit a token | `lib/chain-registry/chains/mantle.ts` — add/edit entry in `tokens` |
-| Update OmeSwap contract address | `lib/chain-registry/chains/mantle.ts` — edit `omeswapPools` / `omeswapRouter` |
+| Add a DEX (UniswapV2-compatible) | `lib/chain-registry/chains/hashkey.ts` — add entry to `dexRouters` |
+| Add a DEX (custom interface) | `lib/chain-registry/chains/hashkey.ts` + add quote logic in `hooks/use-dex-aggregator.tsx` |
+| Remove a DEX | `lib/chain-registry/chains/hashkey.ts` — remove entry from `dexRouters` |
+| Add/edit a token | `lib/chain-registry/chains/hashkey.ts` — add/edit entry in `tokens` |
+| Update OmeSwap contract address | `lib/chain-registry/chains/hashkey.ts` — edit `omeswapPools` / `omeswapRouter` |
 | Switch to a different chain entirely | Create `lib/chain-registry/chains/<chain>.ts`, update `lib/chain-registry/index.ts` |
 | Add a second chain | Create `lib/chain-registry/chains/<chain>.ts`, add to registry in `lib/chain-registry/index.ts` |
 | Use 0G Storage in a component/hook | `import { saveAgentMemory, loadAgentMemory } from '@/lib/zerog'` |
@@ -361,13 +361,13 @@ export class ZeroGComputeNode extends BaseNode {
 
 ## Environment Variables
 
-### Mantle (trading chain)
+### HashKey Chain (trading chain)
 
 | Variable | Description |
 |---|---|
-| `NEXT_PUBLIC_MANTLE_NETWORK` | `mainnet` (5000) or `testnet` (5003) |
-| `NEXT_PUBLIC_MANTLE_RPC` | Mantle EVM RPC (default: `https://rpc.mantle.xyz`) |
-| `NEXT_PUBLIC_MANTLE_WSS` | Mantle WebSocket RPC (default: `wss://wss.mantle.xyz`) |
+| `NEXT_PUBLIC_HASHKEY_NETWORK` | `mainnet` (177) or `testnet` (133) |
+| `NEXT_PUBLIC_HASHKEY_RPC` | HashKey Chain EVM RPC (default: `https://mainnet.hsk.xyz`) |
+| `NEXT_PUBLIC_HASHKEY_WSS` | HashKey Chain WebSocket RPC (default: `wss://wss.hashkey.xyz`) |
 
 ### 0G (external AI/data services)
 
@@ -382,7 +382,7 @@ export class ZeroGComputeNode extends BaseNode {
 | `ZEROG_COMPUTE_SEALED` | `true` to use ZK-verified inference for critical decisions |
 | `NEXT_PUBLIC_0G_DA_RPC` | 0G DA client URL |
 
-Both the Mantle chain config and the 0G service config have safe defaults — the
+Both the HashKey Chain config and the 0G service config have safe defaults — the
 app works out of the box without configuring them for development.
 
 ---
@@ -433,7 +433,7 @@ For the **Best Agent Frameworks** and **Best Autonomous Agents** tracks:
 - [ ] Critical decisions use `sealed: true` for ZK-verified inference
 - [ ] High-volume outputs posted via `postInferenceResult` (0G DA)
 - [ ] Swarm coordination messages sent via `postSwarmMessage` (0G DA)
-- [ ] Contract deployment addresses committed in `lib/chain-registry/chains/mantle.ts`
+- [ ] Contract deployment addresses committed in `lib/chain-registry/chains/hashkey.ts`
 - [ ] Working example agent in the README with inline code or link
 
 ---

@@ -5,7 +5,7 @@ import { WalletProvider } from "@/components/providers/wallet-provider";
 
 export const metadata: Metadata = {
   title: "Omega",
-  description: "The next-generation decentralized exchange on Mantle",
+  description: "The next-generation decentralized exchange on HashKey Chain",
   icons: {
     icon: "/logo.png",
     apple: "/logo.png",

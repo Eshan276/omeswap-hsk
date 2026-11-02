@@ -7,9 +7,9 @@ services:
     envVars:
       - key: PORT
         value: 8080
-      - key: MANTLE_NETWORK
+      - key: HASHKEY_NETWORK
         value: mainnet
-      - key: MANTLE_RPC
-        value: https://rpc.mantle.xyz
-      - key: MANTLE_WSS
-        value: wss://wss.mantle.xyz
+      - key: HASHKEY_RPC
+        value: https://mainnet.hsk.xyz
+      - key: HASHKEY_WSS
+        value: wss://mainnet.hsk.xyz/ws

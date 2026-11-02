@@ -9,7 +9,7 @@
  * Auth: x-wallet-address header (user's connected wallet, identifies agent wallet)
  *
  * Dispatch is driven by the chain registry:
- *   - `custom`     router (e.g. FusionX V3) → viem `exactInputSingle` adapter
+ *   - `custom`     router (e.g. HSKSwap) → viem `exactInputSingle` adapter
  *   - `uniswapV2`  router                   → ethers `swapExactTokensForTokens`
  */
 
@@ -20,7 +20,7 @@ import { parseUnits as viemParseUnits } from "viem";
 import { requireWallet } from "@/lib/marketplace/wallet-header";
 import { getOrCreateAgentWallet } from "@/lib/agent-wallet/manager";
 import { getChainConfig, getDefaultChainId } from "@/lib/chain-registry";
-import { executeFusionXAgentSwap } from "@/lib/dex/fusionx";
+import { executeHSKSwapAgentSwap } from "@/lib/dex/hskswap";
 
 // ── ABIs (UniswapV2-compatible generic path) ──────────────────────────────────
 
@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
       chainId,
     );
 
-    // ── Custom V3 router (FusionX V3) — viem exactInputSingle adapter ──────────
+    // ── Custom V3 router (HSKSwap) — viem exactInputSingle adapter ──────────
     if (routerEntry.type === "custom") {
       const inToken = chainConfig.tokens[tokenInKey];
       if (!inToken) {
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const result = await executeFusionXAgentSwap({
+      const result = await executeHSKSwapAgentSwap({
         account,
         chain: chainConfig.chain,
         rpcUrl: chainConfig.chain.rpcUrls.default.http[0],

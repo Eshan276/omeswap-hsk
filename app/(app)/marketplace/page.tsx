@@ -240,7 +240,7 @@ function FilterContent({
         <Input
           value={filters.asset}
           onChange={(e) => onChange({ asset: e.target.value })}
-          placeholder="e.g. WMNT"
+          placeholder="e.g. WHSK"
           className="border-zinc-700 bg-zinc-900 h-8 text-xs"
         />
       </div>
@@ -435,7 +435,7 @@ export default function MarketplacePage() {
         </h1>
         <p className="mt-2 text-zinc-400">
           Discover, activate, and build on community-published trading strategies
-          and indicators — all logic encrypted on Mantle Storage.
+          and indicators — all logic encrypted on 0G Storage.
         </p>
       </div>
 

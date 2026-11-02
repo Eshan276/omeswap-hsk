@@ -1,5 +1,7 @@
 /**
- * Polls GeckoTerminal + Binance for the curated market list (markets-config.ts)
+ * Polls GeckoTerminal + Binance for the curated market list (markets-config.ts),
+ * and prices HSKSwap markets on this service's HashKey chain from the live
+ * in-memory pool state (GeckoTerminal does not index HSKSwap),
  * and caches the results in-memory, so every consumer (frontend instances, API
  * routes) shares one upstream poll instead of each request hitting GeckoTerminal
  * directly. Mirrors the shapes consumed by lib/dex/geckoterminal.ts in the main
@@ -9,10 +11,13 @@
 import {
   DEX_MARKETS,
   getDexMarketConfig,
+  isHashKeyNetwork,
   type DexDisplayToken,
   type DexToken,
   type MarketConfig,
 } from "./markets-config.js";
+import { HASHKEY_CHAIN_ID } from "./config.js";
+import { getPool } from "./price-state.js";
 
 export type DexMarket = {
   id: string;
@@ -36,7 +41,7 @@ export type DexMarket = {
   leverage: number | null;
   color: string;
   executionVenue: string;
-  source: "geckoterminal" | "binance" | "fallback";
+  source: "geckoterminal" | "binance" | "onchain" | "fallback";
   updatedAt: string;
 };
 
@@ -117,7 +122,13 @@ export function stopMarketDataPolling(): void {
 }
 
 async function refreshAllMarkets(): Promise<void> {
-  const geckoMarkets = DEX_MARKETS.filter((m) => m.kind === "spot");
+  // HashKey markets on this service's chain are priced from live pool state;
+  // HashKey markets on the other network are left to the app's on-chain read.
+  for (const m of DEX_MARKETS) {
+    if (m.kind === "spot" && m.chainId === HASHKEY_CHAIN_ID) refreshOnchainMarket(m);
+  }
+
+  const geckoMarkets = DEX_MARKETS.filter((m) => m.kind === "spot" && !isHashKeyNetwork(m.network));
   const binanceMarkets = DEX_MARKETS.filter((m) => m.kind === "perp" && m.chartSymbol);
 
   const byNetwork = new Map<string, MarketConfig[]>();
@@ -193,6 +204,21 @@ async function refreshGeckoNetwork(network: string, markets: MarketConfig[]): Pr
   }
 }
 
+/** Spot price from the pool's latest sqrtPrice (seeded at boot, updated on every Swap). */
+function refreshOnchainMarket(config: MarketConfig): void {
+  const pool = getPool(config.poolAddress);
+  if (!pool || !(pool.price0in1 > 0)) return;
+  const baseIsToken0 = pool.token0.address.toLowerCase() === config.baseToken.address.toLowerCase();
+  const priceUsd = baseIsToken0 ? pool.price0in1 : 1 / pool.price0in1;
+  tickerCache.set(config.id, {
+    ...marketStaticFields(config),
+    ...config.fallback,
+    priceUsd,
+    source: "onchain",
+    updatedAt: new Date(pool.updatedAt).toISOString(),
+  });
+}
+
 async function refreshBinanceMarket(config: MarketConfig): Promise<void> {
   if (!config.chartSymbol) return;
   try {
@@ -228,7 +254,7 @@ async function fetchCandles(
     if (candles.length) return { candles, isFallback: false };
   }
 
-  if (config.kind === "perp") return { candles: fallbackCandles(config, interval, limit), isFallback: true };
+  if (config.kind === "perp" || isHashKeyNetwork(config.network)) return { candles: fallbackCandles(config, interval, limit), isFallback: true };
 
   const { timeframe, aggregate } = intervalToGecko(interval);
   const token = config.geckoBaseToken ?? "base";
@@ -283,7 +309,7 @@ async function fetchBinanceCandles(config: MarketConfig, interval: DexInterval, 
 }
 
 async function fetchTrades(config: MarketConfig): Promise<DexTrade[]> {
-  if (config.kind === "perp") return fallbackTrades(config);
+  if (config.kind === "perp" || isHashKeyNetwork(config.network)) return fallbackTrades(config);
 
   const displayAddress = (config.displayToken === "base" ? config.baseToken : config.quoteToken).address.toLowerCase();
 
